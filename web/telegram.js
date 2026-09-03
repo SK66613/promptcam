@@ -6,10 +6,25 @@
   const root = document.documentElement;
   root.dataset.telegram = isTelegram ? 'true' : 'false';
 
+  const MOBILE_PLATFORMS = new Set(['ios', 'android', 'android_x']);
+  const DESKTOP_PLATFORMS = new Set(['tdesktop', 'macos', 'web', 'weba', 'webk']);
+  const telegramPlatform = String(tg?.platform || 'web').toLowerCase();
+  const coarsePointer = Boolean(window.matchMedia?.('(pointer: coarse)').matches);
+  const compactViewport = Math.min(window.innerWidth || 0, window.innerHeight || 0) <= 1024;
+  const isMobileTelegram = isTelegram && (
+    MOBILE_PLATFORMS.has(telegramPlatform) ||
+    (!DESKTOP_PLATFORMS.has(telegramPlatform) && coarsePointer && compactViewport)
+  );
+  const isDesktopTelegram = isTelegram && !isMobileTelegram;
+  root.dataset.telegramDevice = isMobileTelegram ? 'mobile' : isDesktopTelegram ? 'desktop' : 'web';
+
   const bridge = {
     isTelegram,
-    platform: tg?.platform || 'web',
+    platform: telegramPlatform,
     version: tg?.version || '',
+    isMobile: isMobileTelegram,
+    isDesktop: isDesktopTelegram,
+    fullscreenPolicy: isMobileTelegram ? 'always' : isDesktopTelegram ? 'never' : 'none',
     sessionValid: false,
     user: null
   };
@@ -32,8 +47,22 @@
     try { return callback(); } catch (_) { return undefined; }
   };
 
+  function enforceFullscreenPolicy() {
+    if (isMobileTelegram) {
+      safe(() => tg.expand());
+      if (typeof tg.requestFullscreen === 'function' && !tg.isFullscreen) {
+        safe(() => tg.requestFullscreen());
+      }
+      return;
+    }
+
+    if (isDesktopTelegram && typeof tg.exitFullscreen === 'function' && tg.isFullscreen) {
+      safe(() => tg.exitFullscreen());
+    }
+  }
+
   safe(() => tg.ready());
-  safe(() => tg.expand());
+  enforceFullscreenPolicy();
   safe(() => tg.setHeaderColor('#09090d'));
   safe(() => tg.setBackgroundColor('#09090d'));
   if (typeof tg.setBottomBarColor === 'function') safe(() => tg.setBottomBarColor('#09090d'));
@@ -77,7 +106,7 @@
 
   openCameraButton?.addEventListener('click', () => {
     safe(() => tg.HapticFeedback?.impactOccurred('light'));
-    if (typeof tg.requestFullscreen === 'function' && !tg.isFullscreen) safe(() => tg.requestFullscreen());
+    enforceFullscreenPolicy();
   }, { capture: true });
 
   recordButton?.addEventListener('click', () => {
@@ -114,6 +143,8 @@
     safe(() => tg.onEvent('viewportChanged', syncTelegramChrome));
     safe(() => tg.onEvent('safeAreaChanged', syncTelegramChrome));
     safe(() => tg.onEvent('contentSafeAreaChanged', syncTelegramChrome));
+    safe(() => tg.onEvent('fullscreenChanged', enforceFullscreenPolicy));
+    safe(() => tg.onEvent('activated', enforceFullscreenPolicy));
     safe(() => tg.onEvent('themeChanged', () => {
       safe(() => tg.setHeaderColor('#09090d'));
       safe(() => tg.setBackgroundColor('#09090d'));
