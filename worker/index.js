@@ -41,7 +41,7 @@ async function verifyTelegramHash(initData, botToken) {
 
   params.delete('hash');
   const dataCheckString = [...params.entries()]
-    .sort(([left], [right]) => left.localeCompare(right))
+    .sort(([left], [right]) => left < right ? -1 : left > right ? 1 : 0)
     .map(([key, value]) => `${key}=${value}`)
     .join('\n');
 
@@ -88,7 +88,10 @@ async function validateTelegramInitData(initData, botToken) {
   }
 
   const params = new URLSearchParams(initData);
-  const authDate = Number(params.get('auth_date'));
+  const rawAuthDate = params.get('auth_date');
+  if (!rawAuthDate) return { ok: false, reason: 'missing_auth_date' };
+
+  const authDate = Number(rawAuthDate);
   const now = Math.floor(Date.now() / 1000);
   if (!Number.isFinite(authDate)) return { ok: false, reason: 'missing_auth_date' };
   if (authDate > now + FUTURE_CLOCK_SKEW_SECONDS) return { ok: false, reason: 'future_auth_date' };
