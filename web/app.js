@@ -211,6 +211,11 @@
     scroller.scrollTop = 0;
   }
 
+  function closeCameraSettings() {
+    settingsToggle.setAttribute('aria-expanded', 'false');
+    cameraSettings.hidden = true;
+  }
+
   function formatTime(seconds) {
     return `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`;
   }
@@ -241,6 +246,7 @@
       showMessage('Этот браузер не поддерживает запись видео. Открой PromptCam в актуальной версии Safari или Chrome.', 6000);
       return;
     }
+    closeCameraSettings();
     record.disabled = true;
     flip.disabled = true;
     resetPrompter();
@@ -332,6 +338,7 @@
 
   function leaveCamera() {
     if (recorder && recorder.state !== 'inactive') { showMessage('Сначала останови запись.'); return; }
+    closeCameraSettings();
     resetPrompter();
     stopTracks();
     camera.classList.add('hidden');
@@ -360,6 +367,7 @@
     prompterText.textContent = value;
     try {
       await startCamera('user', true);
+      closeCameraSettings();
       editor.classList.add('hidden');
       editor.setAttribute('aria-hidden', 'true');
       camera.classList.remove('hidden');

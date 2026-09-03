@@ -33,11 +33,11 @@
 
   <main id="editorView" class="screen editor-screen">
     <div class="editor-shell">
-      <header class="app-brand">
-        <div class="app-logo" aria-hidden="true"><span class="lens"></span><span class="tail"></span></div>
+      <header class="app-brand app-brand-centered">
+        <div class="app-logo app-logo-large" aria-hidden="true"><span class="lens"></span><span class="tail"></span></div>
         <div class="app-brand-copy">
           <strong>Prompt<span>Cam</span></strong>
-          <small>Telegram Mini App</small>
+          <small>Телесуфлёр для видео</small>
         </div>
         <div id="telegramIdentity" class="telegram-identity hidden" aria-live="polite">
           <span class="telegram-dot" aria-hidden="true"></span>
@@ -46,7 +46,7 @@
       </header>
 
       <section class="section-heading script-heading">
-        <div><h1>Сценарий</h1><span class="draft-badge">Черновик</span></div>
+        <div><h1>Твой сценарий</h1><span class="draft-badge">Черновик</span></div>
         <small class="saved-status"><span></span>Сохранено</small>
       </section>
 
@@ -61,14 +61,14 @@
 
       <section class="section-heading settings-heading">
         <div><h2>Настройки телесуфлёра</h2></div>
-        <small>Сохраняются автоматически</small>
+        <small>Автосохранение</small>
       </section>
 
       <section class="settings-stack" aria-label="Настройки суфлёра">
         <div class="setting-card">
           <div class="setting-icon"><svg><use href="#i-speed"/></svg></div>
           <div class="setting-content">
-            <label class="setting-row" for="speedInput"><span><b>Скорость</b><small>Скорость прокрутки текста</small></span><output id="speedValue">42</output></label>
+            <label class="setting-row" for="speedInput"><span><b>Скорость</b><small>Темп прокрутки текста</small></span><output id="speedValue">42</output></label>
             <input id="speedInput" type="range" min="15" max="110" value="42" step="1" />
           </div>
         </div>
@@ -95,7 +95,7 @@
         </div>
       </section>
 
-      <button id="openCameraButton" class="primary-button camera-cta" type="button">Открыть камеру<span class="cta-sub">Перейти к съёмке с телесуфлёром</span></button>
+      <button id="openCameraButton" class="primary-button camera-cta" type="button">Открыть камеру<span class="cta-sub">Перейти к записи с телесуфлёром</span></button>
       <p class="privacy-note">Видео обрабатывается на твоём устройстве</p>
     </div>
   </main>
@@ -107,7 +107,7 @@
     <div class="top-controls">
       <button id="backButton" class="glass-button" type="button" aria-label="Вернуться к тексту"><svg><use href="#i-arrow-left"/></svg></button>
       <div id="recordingPill" class="recording-pill hidden"><span></span><b>REC</b><time id="recordingTime">00:00</time></div>
-      <button id="switchCameraButton" class="glass-button switch-button" type="button" aria-label="Сменить камеру"><svg><use href="#i-camera-switch"/></svg></button>
+      <span class="top-control-spacer" aria-hidden="true"></span>
     </div>
 
     <section id="prompterPanel" class="prompter-panel" aria-label="Текст суфлёра">
@@ -117,7 +117,10 @@
       </div>
     </section>
 
-    <button id="cameraSettingsToggle" class="camera-tool-button" type="button" aria-expanded="false"><svg><use href="#i-sliders"/></svg><span>Настройки</span></button>
+    <div class="camera-tool-rail" aria-label="Инструменты камеры">
+      <button id="switchCameraButton" class="camera-tool-button" type="button" aria-label="Сменить камеру"><svg><use href="#i-camera-switch"/></svg><span>Камера</span></button>
+      <button id="cameraSettingsToggle" class="camera-tool-button" type="button" aria-expanded="false"><svg><use href="#i-sliders"/></svg><span>Настройки</span></button>
+    </div>
     <div id="cameraSettings" class="camera-settings" hidden>
       <label>Скорость <input id="cameraSpeedInput" type="range" min="15" max="110" value="42" /></label>
       <label>Текст <input id="cameraFontInput" type="range" min="22" max="56" value="32" /></label>
