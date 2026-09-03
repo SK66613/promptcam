@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+  <meta name="theme-color" content="#0b0b0f" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="PromptCam" />
+  <title>PromptCam</title>
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <main id="editorView" class="screen editor-screen">
+    <div class="editor-card">
+      <div class="brand-row">
+        <div>
+          <div class="eyebrow">PROMPTCAM</div>
+          <h1>Суфлёр поверх камеры</h1>
+        </div>
+        <span class="beta">WEB MVP</span>
+      </div>
+
+      <label class="field-label" for="scriptInput">Текст для видео</label>
+      <textarea id="scriptInput" rows="12">Всем привет!
+
+Сегодня я хочу показать вам PromptCam — простой суфлёр прямо поверх камеры.
+
+Текст двигается автоматически, а в записанное видео сам суфлёр не попадает.
+
+Можно менять скорость прокрутки и размер шрифта, ставить текст на паузу и переключать камеру.
+
+Готово. Поехали!</textarea>
+
+      <div class="setting-block">
+        <div class="setting-head">
+          <span>Скорость</span>
+          <strong id="speedValue">42 px/сек</strong>
+        </div>
+        <input id="speedInput" type="range" min="15" max="110" value="42" step="1" />
+      </div>
+
+      <div class="setting-block">
+        <div class="setting-head">
+          <span>Размер текста</span>
+          <strong id="fontValue">32 px</strong>
+        </div>
+        <input id="fontInput" type="range" min="22" max="56" value="32" step="1" />
+      </div>
+
+      <button id="openCameraButton" class="primary-button" type="button">Открыть камеру</button>
+      <p class="hint">На iPhone открой эту страницу в Safari и разреши камеру и микрофон.</p>
+    </div>
+  </main>
+
+  <main id="cameraView" class="screen camera-screen hidden">
+    <video id="cameraVideo" autoplay muted playsinline></video>
+    <div class="camera-shade"></div>
+
+    <div class="top-controls safe-top">
+      <button id="backButton" class="icon-button" type="button" aria-label="Назад">←</button>
+      <div id="recordingPill" class="recording-pill hidden"><span></span><b id="recordingTime">00:00</b></div>
+      <button id="switchCameraButton" class="icon-button" type="button" aria-label="Сменить камеру">↻</button>
+    </div>
+
+    <section id="prompterPanel" class="prompter-panel">
+      <div class="focus-line"></div>
+      <div id="prompterScroller" class="prompter-scroller">
+        <div class="prompter-spacer"></div>
+        <div id="prompterText" class="prompter-text"></div>
+        <div class="prompter-spacer bottom"></div>
+      </div>
+    </section>
+
+    <div id="countdown" class="countdown hidden">3</div>
+    <div id="toast" class="toast hidden"></div>
+
+    <div class="bottom-panel safe-bottom">
+      <div class="compact-settings">
+        <label>
+          <span>Скорость</span>
+          <input id="cameraSpeedInput" type="range" min="15" max="110" value="42" step="1" />
+        </label>
+        <label>
+          <span>Текст</span>
+          <input id="cameraFontInput" type="range" min="22" max="56" value="32" step="1" />
+        </label>
+      </div>
+
+      <div class="main-controls">
+        <button id="resetPromptButton" class="round-secondary" type="button" aria-label="Сбросить текст">↺</button>
+        <button id="playPromptButton" class="round-secondary play-button" type="button" aria-label="Старт суфлёра">▶</button>
+        <button id="recordButton" class="record-button" type="button" aria-label="Запись"><span></span></button>
+      </div>
+    </div>
+  </main>
+
+  <dialog id="resultDialog" class="result-dialog">
+    <div class="result-card">
+      <h2>Видео готово</h2>
+      <video id="resultVideo" controls playsinline></video>
+      <div class="result-actions">
+        <button id="shareButton" class="primary-button" type="button">Поделиться / сохранить</button>
+        <a id="downloadButton" class="secondary-link" download="promptcam-video.mp4">Скачать видео</a>
+        <button id="closeResultButton" class="text-button" type="button">Закрыть</button>
+      </div>
+    </div>
+  </dialog>
+
+  <script src="/app.js" defer></script>
+</body>
+</html>
