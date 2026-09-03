@@ -3,15 +3,16 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover, user-scalable=no" />
-  <meta name="theme-color" content="#09090d" />
+  <meta name="theme-color" content="#080811" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="PromptCam" />
   <script src="https://telegram.org/js/telegram-web-app.js?63"></script>
-  <title>PromptCam — мобильный телесуфлёр</title>
+  <title>PromptCam — телесуфлёр для видео</title>
   <link rel="manifest" href="/manifest.webmanifest" />
   <link rel="stylesheet" href="/style.css" />
   <link rel="stylesheet" href="/telegram.css" />
+  <link rel="stylesheet" href="/theme-cinematic.css" />
 </head>
 <body>
   <svg class="svg-sprite" aria-hidden="true">
@@ -23,57 +24,90 @@
     <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M7 7l1 13h8l1-13M10 11v5M14 11v5"/></symbol>
     <symbol id="i-share" viewBox="0 0 24 24"><path d="M12 15V3m0 0L8 7m4-4 4 4M5 12v8h14v-8"/></symbol>
     <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 20h14"/></symbol>
+    <symbol id="i-speed" viewBox="0 0 24 24"><path d="M4 16a8 8 0 1 1 16 0"/><path d="m12 12 4-4"/><path d="M6 17h12"/></symbol>
+    <symbol id="i-text" viewBox="0 0 24 24"><path d="M5 6h14M12 6v12M8 18h8"/></symbol>
+    <symbol id="i-layers" viewBox="0 0 24 24"><path d="m12 3 8 4-8 4-8-4 8-4Z"/><path d="m4 12 8 4 8-4M4 17l8 4 8-4"/></symbol>
+    <symbol id="i-position" viewBox="0 0 24 24"><path d="M4 5h16M7 10h10M5 15h14M9 20h6"/></symbol>
+    <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 6h8M16 6h4M4 12h3M11 12h9M4 18h10M18 18h2"/><circle cx="14" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="16" cy="18" r="2"/></symbol>
   </svg>
 
   <main id="editorView" class="screen editor-screen">
     <div class="editor-shell">
-      <header class="brand">
-        <div class="brand-mark" aria-hidden="true"><span></span></div>
-        <span>PromptCam</span>
+      <header class="app-brand">
+        <div class="app-logo" aria-hidden="true"><span class="lens"></span><span class="tail"></span></div>
+        <div class="app-brand-copy">
+          <strong>Prompt<span>Cam</span></strong>
+          <small>Telegram Mini App</small>
+        </div>
         <div id="telegramIdentity" class="telegram-identity hidden" aria-live="polite">
           <span class="telegram-dot" aria-hidden="true"></span>
           <span id="telegramIdentityText">Telegram</span>
         </div>
       </header>
-      <section class="hero">
-        <p class="eyebrow">МОБИЛЬНЫЙ ТЕЛЕСУФЛЁР</p>
-        <h1>Говори уверенно.<br><em>С первого дубля.</em></h1>
-        <p class="subtitle">Записывай видео, читая текст прямо с экрана.</p>
+
+      <section class="section-heading script-heading">
+        <div><h1>Сценарий</h1><span class="draft-badge">Черновик</span></div>
+        <small class="saved-status"><span></span>Сохранено</small>
       </section>
 
       <section class="editor-card" aria-labelledby="scriptLabel">
-        <div class="field-head">
-          <label id="scriptLabel" for="scriptInput">Твой сценарий</label>
-          <button id="clearScriptButton" class="quiet-button" type="button"><svg><use href="#i-trash"/></svg>Очистить</button>
+        <label id="scriptLabel" class="sr-only" for="scriptInput">Твой сценарий</label>
+        <textarea id="scriptInput" rows="12" autocapitalize="sentences" enterkeyhint="done" spellcheck="true" placeholder="Вставь или напиши сценарий…"></textarea>
+        <div class="editor-footer">
+          <div class="script-meta"><span id="wordCount">0 слов</span><span id="charCount">0 символов</span></div>
+          <button id="clearScriptButton" class="editor-action" type="button"><svg><use href="#i-trash"/></svg>Очистить</button>
         </div>
-        <textarea id="scriptInput" rows="9" autocapitalize="sentences" enterkeyhint="done" spellcheck="true" placeholder="Вставь или напиши текст, который хочешь прочитать…"></textarea>
-        <div class="script-meta"><span id="wordCount">0 слов</span><span id="charCount">0 символов</span></div>
       </section>
 
-      <section class="settings-card" aria-label="Настройки суфлёра">
-        <h2>Настройки суфлёра</h2>
-        <label class="setting-row" for="speedInput"><span><b>Скорость</b><small>Темп прокрутки</small></span><output id="speedValue">42</output></label>
-        <input id="speedInput" type="range" min="15" max="110" value="42" step="1" />
-        <label class="setting-row" for="fontInput"><span><b>Размер текста</b><small>Читаемость подсказки</small></span><output id="fontValue">32</output></label>
-        <input id="fontInput" type="range" min="22" max="56" value="32" step="1" />
-        <label class="setting-row" for="opacityInput"><span><b>Фон</b><small>Прозрачность панели</small></span><output id="opacityValue">55%</output></label>
-        <input id="opacityInput" type="range" min="25" max="85" value="55" step="5" />
-        <label class="setting-row" for="positionInput"><span><b>Положение</b><small>Выше или ниже камеры</small></span><output id="positionValue">По центру</output></label>
-        <input id="positionInput" type="range" min="-1" max="1" value="0" step="1" />
+      <section class="section-heading settings-heading">
+        <div><h2>Настройки телесуфлёра</h2></div>
+        <small>Сохраняются автоматически</small>
       </section>
 
-      <button id="openCameraButton" class="primary-button" type="button">Открыть камеру <span>→</span></button>
-      <p class="privacy-note">Видео остаётся на твоём устройстве</p>
+      <section class="settings-stack" aria-label="Настройки суфлёра">
+        <div class="setting-card">
+          <div class="setting-icon"><svg><use href="#i-speed"/></svg></div>
+          <div class="setting-content">
+            <label class="setting-row" for="speedInput"><span><b>Скорость</b><small>Скорость прокрутки текста</small></span><output id="speedValue">42</output></label>
+            <input id="speedInput" type="range" min="15" max="110" value="42" step="1" />
+          </div>
+        </div>
+        <div class="setting-card">
+          <div class="setting-icon"><svg><use href="#i-text"/></svg></div>
+          <div class="setting-content">
+            <label class="setting-row" for="fontInput"><span><b>Размер текста</b><small>Размер и читаемость</small></span><output id="fontValue">32</output></label>
+            <input id="fontInput" type="range" min="22" max="56" value="32" step="1" />
+          </div>
+        </div>
+        <div class="setting-card compact-setting">
+          <div class="setting-icon"><svg><use href="#i-layers"/></svg></div>
+          <div class="setting-content">
+            <label class="setting-row" for="opacityInput"><span><b>Фон</b><small>Прозрачность панели</small></span><output id="opacityValue">55%</output></label>
+            <input id="opacityInput" type="range" min="25" max="85" value="55" step="5" />
+          </div>
+        </div>
+        <div class="setting-card compact-setting">
+          <div class="setting-icon"><svg><use href="#i-position"/></svg></div>
+          <div class="setting-content">
+            <label class="setting-row" for="positionInput"><span><b>Положение</b><small>Положение телесуфлёра</small></span><output id="positionValue">По центру</output></label>
+            <input id="positionInput" type="range" min="-1" max="1" value="0" step="1" />
+          </div>
+        </div>
+      </section>
+
+      <button id="openCameraButton" class="primary-button camera-cta" type="button">Открыть камеру<span class="cta-sub">Перейти к съёмке с телесуфлёром</span></button>
+      <p class="privacy-note">Видео обрабатывается на твоём устройстве</p>
     </div>
   </main>
 
   <main id="cameraView" class="screen camera-screen hidden" aria-hidden="true">
     <video id="cameraVideo" autoplay muted playsinline></video>
     <div class="camera-shade"></div>
+
     <div class="top-controls">
       <button id="backButton" class="glass-button" type="button" aria-label="Вернуться к тексту"><svg><use href="#i-arrow-left"/></svg></button>
       <div id="recordingPill" class="recording-pill hidden"><span></span><b>REC</b><time id="recordingTime">00:00</time></div>
-      <button id="switchCameraButton" class="glass-button" type="button" aria-label="Сменить камеру"><svg><use href="#i-camera-switch"/></svg></button>
+      <button id="switchCameraButton" class="glass-button switch-button" type="button" aria-label="Сменить камеру"><svg><use href="#i-camera-switch"/></svg></button>
     </div>
 
     <section id="prompterPanel" class="prompter-panel" aria-label="Текст суфлёра">
@@ -83,28 +117,31 @@
       </div>
     </section>
 
+    <button id="cameraSettingsToggle" class="camera-tool-button" type="button" aria-expanded="false"><svg><use href="#i-sliders"/></svg><span>Настройки</span></button>
+    <div id="cameraSettings" class="camera-settings" hidden>
+      <label>Скорость <input id="cameraSpeedInput" type="range" min="15" max="110" value="42" /></label>
+      <label>Текст <input id="cameraFontInput" type="range" min="22" max="56" value="32" /></label>
+      <label>Фон <input id="cameraOpacityInput" type="range" min="25" max="85" value="55" step="5" /></label>
+      <label>Положение <input id="cameraPositionInput" type="range" min="-1" max="1" value="0" step="1" /></label>
+    </div>
+
     <div id="countdown" class="countdown hidden" aria-live="assertive"><span>3</span></div>
     <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 
     <div id="cameraPanel" class="bottom-panel">
-      <button id="cameraSettingsToggle" class="settings-toggle" type="button" aria-expanded="false">Настройки <span>⌃</span></button>
-      <div id="cameraSettings" class="camera-settings" hidden>
-        <label>Скорость <input id="cameraSpeedInput" type="range" min="15" max="110" value="42" /></label>
-        <label>Текст <input id="cameraFontInput" type="range" min="22" max="56" value="32" /></label>
-        <label>Фон <input id="cameraOpacityInput" type="range" min="25" max="85" value="55" step="5" /></label>
-        <label>Положение <input id="cameraPositionInput" type="range" min="-1" max="1" value="0" step="1" /></label>
-      </div>
       <div class="main-controls">
         <button id="resetPromptButton" class="control-button" type="button" aria-label="Вернуть текст в начало"><svg><use href="#i-reset"/></svg><small>Сначала</small></button>
-        <button id="playPromptButton" class="control-button" type="button" aria-label="Запустить суфлёр"><svg><use href="#i-play"/></svg><small>Старт</small></button>
         <button id="recordButton" class="record-control" type="button" aria-label="Начать запись"><span class="record-shape"></span><small>Запись</small></button>
+        <button id="playPromptButton" class="control-button" type="button" aria-label="Запустить суфлёр"><svg><use href="#i-play"/></svg><small>Старт</small></button>
       </div>
     </div>
   </main>
 
   <dialog id="resultDialog" class="result-dialog">
     <div class="result-card">
-      <div class="success-mark">✓</div><p class="eyebrow">ЗАПИСЬ ЗАВЕРШЕНА</p><h2>Видео готово</h2>
+      <div class="success-mark">✓</div>
+      <p class="eyebrow">ЗАПИСЬ ЗАВЕРШЕНА</p>
+      <h2>Видео готово</h2>
       <video id="resultVideo" controls playsinline></video>
       <div class="result-actions">
         <button id="shareButton" class="primary-button" type="button"><svg><use href="#i-share"/></svg>Сохранить / поделиться</button>
@@ -115,6 +152,7 @@
       <p id="shareFallback" class="result-note hidden">Поделиться файлом здесь нельзя. Нажми «Скачать файл», затем поделись им из приложения «Фото» или «Файлы».</p>
     </div>
   </dialog>
+
   <script src="/telegram.js" defer></script>
   <script src="/app.js" defer></script>
 </body>
