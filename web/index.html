@@ -7,6 +7,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="PromptCam" />
+  <script src="https://telegram.org/js/telegram-web-app.js?63"></script>
   <title>PromptCam — мобильный телесуфлёр</title>
   <link rel="manifest" href="/manifest.webmanifest" />
   <link rel="stylesheet" href="/style.css" />
@@ -28,6 +29,10 @@
       <header class="brand">
         <div class="brand-mark" aria-hidden="true"><span></span></div>
         <span>PromptCam</span>
+        <div id="telegramIdentity" class="telegram-identity hidden" aria-live="polite">
+          <span class="telegram-dot" aria-hidden="true"></span>
+          <span id="telegramIdentityText">Telegram</span>
+        </div>
       </header>
       <section class="hero">
         <p class="eyebrow">МОБИЛЬНЫЙ ТЕЛЕСУФЛЁР</p>
@@ -109,6 +114,7 @@
       <p id="shareFallback" class="result-note hidden">Поделиться файлом здесь нельзя. Нажми «Скачать файл», затем поделись им из приложения «Фото» или «Файлы».</p>
     </div>
   </dialog>
+  <script src="/telegram.js" defer></script>
   <script src="/app.js" defer></script>
 </body>
 </html>
