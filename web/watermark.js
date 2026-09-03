@@ -1,9 +1,6 @@
 (() => {
   'use strict';
 
-  const NativeMediaRecorder = window.MediaRecorder;
-  if (typeof NativeMediaRecorder === 'undefined') return;
-
   const state = {
     enabled: true,
     text: 'PromptCam',
@@ -11,6 +8,10 @@
     targetFps: 30,
     lastMode: 'idle',
     lastReason: '',
+    width: 0,
+    height: 0,
+    captureStreamSupported: false,
+    videoReadyState: 0,
     activeCleanups: new Set()
   };
 
@@ -22,15 +23,25 @@
     get lastMode() { return state.lastMode; },
     get lastReason() { return state.lastReason; },
     setEnabled(value) { state.enabled = Boolean(value); },
+    markFallback(reason) { mark('fallback', reason); },
+    prepareRecordingStream(sourceStream, cameraVideo) {
+      return prepareWatermarkedStream(sourceStream, cameraVideo);
+    },
     getStatus() {
       return {
         enabled: state.enabled,
         text: state.text,
         mode: state.lastMode,
-        reason: state.lastReason
+        reason: state.lastReason,
+        width: state.width,
+        height: state.height,
+        targetFps: state.targetFps,
+        captureStreamSupported: state.captureStreamSupported,
+        videoReadyState: state.videoReadyState
       };
     }
   };
+
   window.PromptCamWatermark = api;
 
   function mark(mode, reason = '') {
@@ -38,13 +49,13 @@
     state.lastReason = reason;
     document.documentElement.dataset.watermarkMode = mode;
     window.dispatchEvent(new CustomEvent('promptcam:watermark-mode', {
-      detail: { mode, reason }
+      detail: api.getStatus()
     }));
   }
 
-  function fallback(stream, reason) {
+  function fallback(sourceStream, reason) {
     mark('fallback', reason);
-    return { stream, cleanup() {} };
+    return { stream: sourceStream, cleanup() {} };
   }
 
   function clamp(value, min, max) {
@@ -68,27 +79,34 @@
     context.restore();
   }
 
-  function prepareWatermarkedStream(sourceStream) {
+  function prepareWatermarkedStream(sourceStream, cameraVideo) {
+    state.width = 0;
+    state.height = 0;
+    state.videoReadyState = Number(cameraVideo?.readyState || 0);
+
     if (!state.enabled) {
       mark('disabled');
       return { stream: sourceStream, cleanup() {} };
     }
 
-    const cameraVideo = document.getElementById('cameraVideo');
-    const captureStream = HTMLCanvasElement.prototype.captureStream || HTMLCanvasElement.prototype.mozCaptureStream;
     if (!cameraVideo) return fallback(sourceStream, 'camera_video_missing');
-    if (typeof captureStream !== 'function') return fallback(sourceStream, 'canvas_capture_stream_unsupported');
     if (!sourceStream?.getVideoTracks?.().length) return fallback(sourceStream, 'video_track_missing');
+
+    const canvas = document.createElement('canvas');
+    const captureStream = canvas.captureStream || canvas.mozCaptureStream;
+    state.captureStreamSupported = typeof captureStream === 'function';
+    if (!state.captureStreamSupported) return fallback(sourceStream, 'canvas_capture_stream_unsupported');
 
     const sourceTrack = sourceStream.getVideoTracks()[0];
     const settings = sourceTrack.getSettings?.() || {};
     const width = Math.round(cameraVideo.videoWidth || settings.width || 0);
     const height = Math.round(cameraVideo.videoHeight || settings.height || 0);
-    if (!width || !height || cameraVideo.readyState < 2) {
-      return fallback(sourceStream, 'camera_video_not_ready');
-    }
+    state.width = width;
+    state.height = height;
 
-    const canvas = document.createElement('canvas');
+    if (!width || !height) return fallback(sourceStream, 'video_dimensions_missing');
+    if (cameraVideo.readyState < 2) return fallback(sourceStream, 'camera_video_not_ready');
+
     canvas.width = width;
     canvas.height = height;
     const context = canvas.getContext('2d', { alpha: false, desynchronized: true });
@@ -104,7 +122,7 @@
         context.drawImage(cameraVideo, 0, 0, width, height);
         drawWatermark(context, width, height);
       } catch (_) {
-        // A transient draw failure should not terminate the recording loop.
+        // A transient draw failure should not stop the recording loop.
       }
     };
 
@@ -158,40 +176,6 @@
     schedule();
     mark('watermarked');
     return { stream: outputStream, cleanup };
-  }
-
-  const MediaRecorderProxy = new Proxy(NativeMediaRecorder, {
-    construct(Target, args) {
-      const sourceStream = args[0];
-      const prepared = prepareWatermarkedStream(sourceStream);
-      const nextArgs = args.length > 1 ? [prepared.stream, args[1]] : [prepared.stream];
-      let recorder;
-
-      try {
-        recorder = Reflect.construct(Target, nextArgs, Target);
-      } catch (error) {
-        prepared.cleanup();
-        if (prepared.stream !== sourceStream) {
-          mark('fallback', 'watermarked_recorder_creation_failed');
-          recorder = args.length > 1
-            ? Reflect.construct(Target, [sourceStream, args[1]], Target)
-            : Reflect.construct(Target, [sourceStream], Target);
-        } else {
-          throw error;
-        }
-      }
-
-      const cleanup = () => prepared.cleanup();
-      recorder.addEventListener('stop', cleanup, { once: true });
-      recorder.addEventListener('error', cleanup, { once: true });
-      return recorder;
-    }
-  });
-
-  try {
-    window.MediaRecorder = MediaRecorderProxy;
-  } catch (_) {
-    mark('fallback', 'media_recorder_proxy_unavailable');
   }
 
   window.addEventListener('pagehide', () => {
