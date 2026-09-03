@@ -1,16 +1,30 @@
-html[data-telegram="true"]{
-  --safe-top:max(env(safe-area-inset-top,0px),var(--tg-content-safe-area-inset-top,0px),var(--tg-safe-area-inset-top,0px));
-  --safe-bottom:max(env(safe-area-inset-bottom,0px),var(--tg-content-safe-area-inset-bottom,0px),var(--tg-safe-area-inset-bottom,0px));
-  --tg-safe-left:max(env(safe-area-inset-left,0px),var(--tg-content-safe-area-inset-left,0px),var(--tg-safe-area-inset-left,0px));
-  --tg-safe-right:max(env(safe-area-inset-right,0px),var(--tg-content-safe-area-inset-right,0px),var(--tg-safe-area-inset-right,0px));
+/* Telegram owns the mobile top chrome. These four variables are the only layout
+   contract used by the shared editor and camera styles. */
+html[data-telegram="true"] {
+  --app-safe-top: max(env(safe-area-inset-top, 0px), var(--tg-content-safe-area-inset-top, 0px), var(--tg-safe-area-inset-top, 0px));
+  --app-safe-bottom: max(env(safe-area-inset-bottom, 0px), var(--tg-content-safe-area-inset-bottom, 0px), var(--tg-safe-area-inset-bottom, 0px));
+  --app-safe-left: max(env(safe-area-inset-left, 0px), var(--tg-content-safe-area-inset-left, 0px), var(--tg-safe-area-inset-left, 0px));
+  --app-safe-right: max(env(safe-area-inset-right, 0px), var(--tg-content-safe-area-inset-right, 0px), var(--tg-safe-area-inset-right, 0px));
 }
 
-.telegram-identity{margin-left:auto;display:flex;align-items:center;gap:7px;max-width:46%;min-height:32px;padding:0 10px;border:1px solid #ffffff14;border-radius:999px;background:#ffffff0a;color:#c9c7d1;font-size:12px;font-weight:700;white-space:nowrap;overflow:hidden}
-.telegram-identity>span:last-child{overflow:hidden;text-overflow:ellipsis}
-.telegram-dot{flex:0 0 auto;width:7px;height:7px;border-radius:50%;background:#5aa8ff;box-shadow:0 0 0 3px #5aa8ff1a}
+/* Fullscreen Telegram controls float above the webview. Reserve their visual
+   row even when an older client reports a smaller content-safe-area value. */
+html[data-telegram="true"][data-telegram-device="mobile"] {
+  --telegram-chrome-reserve: clamp(72px, 10.5dvh, 96px);
+  --app-safe-top: max(env(safe-area-inset-top, 0px), var(--tg-content-safe-area-inset-top, 0px), var(--tg-safe-area-inset-top, 0px), var(--telegram-chrome-reserve));
+}
 
-html[data-telegram="true"] .editor-screen{padding-left:max(18px,var(--tg-safe-left));padding-right:max(18px,var(--tg-safe-right))}
-html[data-telegram="true"] .top-controls,html[data-telegram="true"] .prompter-panel{left:max(14px,var(--tg-safe-left));right:max(14px,var(--tg-safe-right))}
-html[data-telegram="true"] .toast{left:max(18px,var(--tg-safe-left));right:max(18px,var(--tg-safe-right))}
+.telegram-identity { position: absolute; top: 10px; right: 0; display: flex; align-items: center; gap: 7px; max-width: 34%; min-height: 32px; padding: 0 10px; border: 1px solid #ffffff14; border-radius: 999px; background: #ffffff0a; color: #c9c7d1; font-size: 12px; font-weight: 700; white-space: nowrap; overflow: hidden; }
+.telegram-identity > span:last-child { overflow: hidden; text-overflow: ellipsis; }
+.telegram-dot { flex: 0 0 auto; width: 7px; height: 7px; border-radius: 50%; background: #5aa8ff; box-shadow: 0 0 0 3px #5aa8ff1a; }
 
-@media (max-width:390px){.telegram-identity{max-width:42%;padding:0 8px;font-size:11px}}
+html[data-telegram="true"] .app-brand-copy small { color: #8d87a5; }
+html[data-telegram="true"] .app-logo { box-shadow: 0 0 28px rgba(122,74,255,.28), inset 0 0 12px rgba(255,255,255,.04); }
+html[data-telegram="true"] #backButton { visibility: hidden; pointer-events: none; }
+
+@media (max-width: 390px) { .telegram-identity { max-width: 31%; padding: 0 8px; font-size: 11px; } }
+@media (min-width: 820px) {
+  html[data-telegram-device="desktop"] .camera-screen { position: absolute; min-height: 100%; border-radius: 18px; }
+  html[data-telegram-device="desktop"] .prompter-panel { left: 22px; right: 22px; max-width: 640px; margin-inline: auto; }
+  html[data-telegram-device="desktop"] .bottom-panel { border-radius: 0 0 18px 18px; }
+}

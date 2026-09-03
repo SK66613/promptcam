@@ -211,6 +211,11 @@
     scroller.scrollTop = 0;
   }
 
+  function closeCameraSettings() {
+    settingsToggle.setAttribute('aria-expanded', 'false');
+    cameraSettings.hidden = true;
+  }
+
   function formatTime(seconds) {
     return `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`;
   }
@@ -243,6 +248,7 @@
     }
     record.disabled = true;
     flip.disabled = true;
+    closeCameraSettings();
     resetPrompter();
     await runCountdown();
     chunks = [];
@@ -333,6 +339,7 @@
   function leaveCamera() {
     if (recorder && recorder.state !== 'inactive') { showMessage('Сначала останови запись.'); return; }
     resetPrompter();
+    closeCameraSettings();
     stopTracks();
     camera.classList.add('hidden');
     camera.setAttribute('aria-hidden', 'true');

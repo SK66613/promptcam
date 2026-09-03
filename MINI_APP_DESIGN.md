@@ -62,6 +62,25 @@ The hidden HTML `#backButton` remains in the DOM because the existing Telegram b
 
 In Safari / Chrome, Telegram BackButton does not exist, so PromptCam's own `#backButton` remains visible and functional.
 
+Do not add a PromptCam header that imitates Telegram, a second close control, or a logo squeezed between Telegram's Back and menu controls.
+
+## Safe-area contract
+
+Telegram chrome is part of the layout contract, not decoration. Shared UI consumes `--app-safe-top`, `--app-safe-bottom`, `--app-safe-left`, and `--app-safe-right`. In standalone browsers these map to CSS environment insets. Telegram overrides them with the largest reported safe/content-safe inset.
+
+On mobile Telegram, `--app-safe-top` also includes an adaptive 72–96 px visual reserve. This keeps branding, the recording HUD, and the teleprompter below the native Close/Back, collapse, and menu controls on iPhones (including Dynamic Island models) and Android without imposing that space on standalone web or Telegram Desktop.
+
+## Camera hierarchy
+
+The visual order is deliberately strict:
+
+1. full-viewport camera preview;
+2. readable glass teleprompter and its single glowing focus line;
+3. central record/stop control;
+4. secondary reset, play/pause, camera switch, and collapsed settings controls.
+
+Camera settings close automatically when recording begins. Secondary controls disappear during recording so they cannot compete with the subject, script, and stop action.
+
 ## Fullscreen rule
 
 The fullscreen policy is defined separately in `TELEGRAM_DISPLAY_BEHAVIOR.md`:
