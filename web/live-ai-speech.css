@@ -1,0 +1,13 @@
+.live-ai-speech-status {
+  min-height: 18px;
+  margin: 4px 1px 0;
+  padding-top: 7px;
+  border-top: 1px solid rgba(255,255,255,.055);
+  color: #8f899f;
+  font-size: 8.5px;
+  line-height: 1.4;
+  text-wrap: pretty;
+}
+
+.live-ai-speech-status[data-tone="success"] { color: #91ddb0; }
+.live-ai-speech-status[data-tone="error"] { color: #ff9da8; }
