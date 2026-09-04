@@ -177,6 +177,7 @@ async function authenticateMiniApp(request, env) {
   if (!result.ok) return { ok: false, response: json({ ok: false, error: result.reason }, 401) };
   return { ok: true, body, session: result };
 }
+
 async function telegramSession(request, env) {
   const auth = await authenticateMiniApp(request, env);
   if (!auth.ok) return auth.response;
