@@ -147,7 +147,7 @@ async function callSpeechProvider(env, audio, mimeType, scriptContext, previousT
   const prompt = transcriptionPrompt(scriptContext, previousText);
   if (prompt) form.append('prompt', prompt);
   const language = compactText(user?.language_code || '', 12).split(/[-_]/)[0].toLowerCase();
-  if (/^[a-z]{2,3}$/.test(language)) form.append('languages[]', language);
+  if (/^[a-z]{2,3}$/.test(language)) form.append('language', language);
 
   const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
     method: 'POST',
