@@ -5,6 +5,7 @@ const SPEECH_CONTEXT_MAX_CHARS = 520;
 const SCRIPT_CONTEXT_MAX_CHARS = 1000;
 const COMBINED_CONTEXT_MAX_CHARS = 1600;
 const SPEECH_CONTEXT_MAX_SPAN_MS = 35_000;
+const LIVE_AI_MAX_REQUEST_BYTES = 1_500_000;
 
 function compactText(value, maxLength) {
   if (typeof value !== 'string') return '';
@@ -17,7 +18,15 @@ function normalizeSpanMs(value) {
   return Math.min(SPEECH_CONTEXT_MAX_SPAN_MS, number);
 }
 
+function requestTooLarge(request) {
+  const rawLength = request.headers.get('Content-Length');
+  if (!rawLength) return false;
+  const length = Number(rawLength);
+  return Number.isFinite(length) && length > LIVE_AI_MAX_REQUEST_BYTES;
+}
+
 async function rewriteLiveAiRequest(request) {
+  if (requestTooLarge(request)) return { request, speech: null };
   const contentType = request.headers.get('Content-Type') || '';
   if (!contentType.toLowerCase().includes('application/json')) {
     return { request, speech: null };
@@ -45,7 +54,7 @@ async function rewriteLiveAiRequest(request) {
   const scriptText = compactText(body.scriptContext, SCRIPT_CONTEXT_MAX_CHARS);
   const seconds = Math.max(1, Math.round(spanMs / 1000));
   body.scriptContext = [
-    `[RECENT_SPEECH_WORDS_LAST_${seconds}S] ${speechText}`,
+    `[RECENT_ACTUAL_SPEECH_WORDS_ONLY_NO_PROSODY_LAST_${seconds}S] ${speechText}`,
     `[TELEPROMPTER_SCRIPT_TOPIC] ${scriptText}`
   ].join('\n').slice(0, COMBINED_CONTEXT_MAX_CHARS);
 
