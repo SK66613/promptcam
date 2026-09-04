@@ -8,7 +8,7 @@ const PLANS = Object.freeze({
     id: 'day',
     title: '1 день',
     description: 'PromptCam Pro на 24 часа',
-    stars: 25,
+    stars: 1,
     durationSeconds: 24 * 60 * 60,
     recurring: false,
     badge: ''
