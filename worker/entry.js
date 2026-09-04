@@ -10,6 +10,7 @@ const AI_ALLOWED_TYPES = new Set([
   'crew_light', 'crew_actor', 'acting', 'critic', 'praise', 'none'
 ]);
 const AI_TEMPORAL_MODES = new Set(['crew', 'acting']);
+const AI_PRESENTATION_STYLES = new Set(['calm', 'energetic', 'expert', 'friendly']);
 const AI_FRAME_PATTERN = /^data:image\/(?:jpeg|webp);base64,[A-Za-z0-9+/=]+$/;
 const AI_MAX_REQUEST_BYTES = 1_500_000;
 const AI_MAX_FRAME_CHARS = 650_000;
@@ -157,7 +158,13 @@ function normalizeLiveAiBody(body) {
   const scriptContext = compactText(body.scriptContext, AI_SCRIPT_CONTEXT_MAX_CHARS);
   const history = normalizeLiveAiHistory(body.history);
   const temporalFrames = normalizeLiveAiTemporalFrames(body.temporalFrames, body.mode);
-  return { ok: true, body: { ...body, rhythm, trigger, scriptContext, history, temporalFrames } };
+  const presentationStyle = AI_TEMPORAL_MODES.has(body.mode)
+    ? (AI_PRESENTATION_STYLES.has(body.presentationStyle) ? body.presentationStyle : 'expert')
+    : '';
+  return {
+    ok: true,
+    body: { ...body, rhythm, trigger, scriptContext, history, temporalFrames, presentationStyle }
+  };
 }
 
 async function authenticateLiveAi(request, env, ctx, initData) {
@@ -252,6 +259,7 @@ function modeInstruction(mode) {
       'Return type=crew_actor for observable gaze direction, head angle, shoulder or torso posture, visible gesture use, facial expressiveness, or a repeated visible delivery pattern supported by temporal frames.',
       'Return type=crew_director for the overall beat, pacing, reveal, prop use, or the next performance action tied to the video topic.',
       'Pick only a clearly visible and immediately actionable point. If several things could improve, choose the most important one.',
+      'Framing or lighting problems may override presentation style when they are the more important visible issue.',
       'If the shot is already solid, use crew_director for a short positive hold-or-next-beat direction instead of inventing a flaw.',
       'Use relative language such as slightly higher or a little closer; do not invent exact measurements.',
       'Only call a behavior repeated, persistent, or changing over time when the supplied temporal sequence clearly supports that claim across multiple frames.',
@@ -264,6 +272,7 @@ function modeInstruction(mode) {
       'Return type=acting.',
       'Give exactly one immediately actionable cue based only on what is visibly supported by the current and temporal frames.',
       'Focus on gaze direction, head angle, shoulders and torso posture, visible hand or arm gestures, facial expressiveness as an observable expression, and how the visible delivery setup fits the script topic.',
+      'Use the selected presentation style as a coaching target, but only recommend controllable visible adjustments supported by the frame.',
       'You may point out a repeated gesture, static posture, recurring gaze direction, or visible change only when that pattern appears consistently in multiple temporal frames.',
       'Phrase the line as coaching: what to do next, not a personal judgment.',
       'If hands or body are outside the frame, do not invent information about them.',
@@ -339,12 +348,43 @@ function temporalInstruction(body) {
   ].join(' ');
 }
 
+function styleInstruction(body) {
+  if (!AI_TEMPORAL_MODES.has(body.mode)) return '';
+  if (body.presentationStyle === 'calm') {
+    return [
+      'Presentation style target=calm.',
+      'Coach toward visually stable balanced posture, steady gaze when practical, restrained purposeful gestures, and softer visible facial expressiveness.',
+      'Do not claim or prescribe vocal speed because audio is not available.'
+    ].join(' ');
+  }
+  if (body.presentationStyle === 'energetic') {
+    return [
+      'Presentation style target=energetic.',
+      'Coach toward visibly livelier but controlled delivery: purposeful broader gestures when hands are visible, stronger facial expressiveness, and a slightly more engaged body position without destabilizing the frame.',
+      'Do not invent movement outside the visible frame.'
+    ].join(' ');
+  }
+  if (body.presentationStyle === 'friendly') {
+    return [
+      'Presentation style target=friendly.',
+      'Coach toward visually warm conversational delivery: open posture, natural visible expressiveness, gentle gestural openness when hands are visible, and comfortable lens-facing engagement.',
+      'Do not evaluate attractiveness or personality.'
+    ].join(' ');
+  }
+  return [
+    'Presentation style target=expert.',
+    'Coach toward a visually credible expert delivery: balanced upright posture, steady lens-facing engagement when practical, compact deliberate gestures, minimal visible fidget, and clean controlled composition.',
+    'Do not equate posture with confidence or infer internal traits.'
+  ].join(' ');
+}
+
 function buildLiveAiPrompt(body, languageCode) {
   const language = typeof languageCode === 'string' && languageCode ? languageCode : 'en';
   const context = contextInstruction(body.scriptContext, body.history);
   return [
     `Mode=${body.mode}. Rhythm=${body.rhythm}. Trigger=${body.trigger}. Reply language=${language}.`,
     modeInstruction(body.mode),
+    styleInstruction(body),
     rhythmInstruction(body.rhythm, body.trigger),
     context,
     temporalInstruction(body),
@@ -547,6 +587,7 @@ async function liveAi(request, env, ctx) {
     ...provider.result,
     rhythm: body.rhythm,
     trigger: body.trigger,
+    presentationStyle: body.presentationStyle || null,
     temporal: { frames: body.temporalFrames.length, spanMs: temporalSpanMs },
     latency: { totalMs, providerMs },
     rateLimit: { remaining: rateLimit.remaining }
