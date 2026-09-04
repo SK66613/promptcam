@@ -115,7 +115,8 @@
   color: #fff;
   box-shadow: 0 0 16px rgba(108,77,255,.28);
 }
-.live-ai-mode-label {
+.live-ai-mode-label,
+.live-ai-rhythm-label {
   display: block;
   margin: 12px 2px 7px;
   color: #7f7a8e;
@@ -143,6 +144,31 @@
   background: rgba(113,78,255,.13);
   color: #eee8ff;
 }
+.live-ai-rhythm {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px;
+}
+.live-ai-rhythm-option {
+  min-height: 52px;
+  display: grid;
+  align-content: center;
+  gap: 3px;
+  padding: 7px 9px;
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: 12px;
+  background: rgba(255,255,255,.035);
+  color: #aaa5b7;
+  text-align: left;
+}
+.live-ai-rhythm-option strong { color: inherit; font-size: 10px; font-weight: 760; }
+.live-ai-rhythm-option small { color: #7f7a8e; font-size: 8px; line-height: 1.25; }
+.live-ai-rhythm-option.is-selected {
+  border-color: rgba(142,105,255,.42);
+  background: linear-gradient(155deg, rgba(113,78,255,.18), rgba(63,83,180,.11));
+  color: #f2edff;
+}
+.live-ai-rhythm-option.is-selected small { color: #b5abc8; }
 .live-ai-status {
   min-height: 30px;
   margin: 10px 1px 0;
@@ -218,7 +244,7 @@
     padding: 12px;
   }
   .live-ai-copy { margin: 7px 0 9px; }
-  .live-ai-mode-label { margin-top: 9px; }
+  .live-ai-mode-label, .live-ai-rhythm-label { margin-top: 9px; }
   .live-ai-status { margin-top: 7px; }
   .live-ai-suggestion { bottom: calc(109px + var(--app-safe-bottom)); }
 }
@@ -228,7 +254,8 @@
     right: max(76px, calc(var(--app-safe-right) + 68px));
     width: min(268px, calc(100vw - 90px - var(--app-safe-left) - var(--app-safe-right)));
   }
-  .live-ai-modes { grid-template-columns: 1fr; }
+  .live-ai-modes,
+  .live-ai-rhythm { grid-template-columns: 1fr; }
   .live-ai-suggestion {
     width: min(260px, calc(100vw - 96px - var(--app-safe-left) - var(--app-safe-right)));
   }
