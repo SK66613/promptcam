@@ -131,15 +131,21 @@ async function consumeAiRateLimit(env, telegramId) {
   const now = Math.floor(Date.now() / 1000);
   const minuteBucket = Math.floor(now / 60);
   try {
-    const row = await env.DB.prepare(`
-      SELECT requests
-      FROM ai_usage_minute
-      WHERE telegram_id = ? AND minute_bucket = ?
-      LIMIT 1
-    `).bind(telegramId, minuteBucket).first();
+    await env.DB.prepare(`
+      INSERT OR IGNORE INTO ai_usage_minute (telegram_id, minute_bucket, requests, updated_at)
+      VALUES (?, ?, 0, ?)
+    `).bind(telegramId, minuteBucket, now).run();
 
-    const current = Number(row?.requests || 0);
-    if (current >= AI_RATE_LIMIT_PER_MINUTE) {
+    const update = await env.DB.prepare(`
+      UPDATE ai_usage_minute
+      SET requests = requests + 1, updated_at = ?
+      WHERE telegram_id = ?
+        AND minute_bucket = ?
+        AND requests < ?
+    `).bind(now, telegramId, minuteBucket, AI_RATE_LIMIT_PER_MINUTE).run();
+
+    const changes = Number(update?.meta?.changes ?? update?.changes ?? 0);
+    if (changes < 1) {
       return {
         ok: false,
         configured: true,
@@ -149,18 +155,18 @@ async function consumeAiRateLimit(env, telegramId) {
       };
     }
 
-    await env.DB.prepare(`
-      INSERT INTO ai_usage_minute (telegram_id, minute_bucket, requests, updated_at)
-      VALUES (?, ?, 1, ?)
-      ON CONFLICT(telegram_id, minute_bucket) DO UPDATE SET
-        requests = ai_usage_minute.requests + 1,
-        updated_at = excluded.updated_at
-    `).bind(telegramId, minuteBucket, now).run();
+    const row = await env.DB.prepare(`
+      SELECT requests
+      FROM ai_usage_minute
+      WHERE telegram_id = ? AND minute_bucket = ?
+      LIMIT 1
+    `).bind(telegramId, minuteBucket).first();
+    const current = Number(row?.requests || AI_RATE_LIMIT_PER_MINUTE);
 
     return {
       ok: true,
       configured: true,
-      remaining: Math.max(0, AI_RATE_LIMIT_PER_MINUTE - current - 1)
+      remaining: Math.max(0, AI_RATE_LIMIT_PER_MINUTE - current)
     };
   } catch (_) {
     return { ok: false, configured: false };
@@ -273,6 +279,7 @@ async function liveAi(request, env, ctx) {
 
   const auth = await authenticateLiveAi(request, env, ctx, body.initData);
   if (!auth.ok) return auth.response;
+  if (!env.OPENAI_API_KEY) return json({ ok: false, error: 'ai_not_configured' }, 503);
 
   const rateLimit = await consumeAiRateLimit(env, String(auth.user.id));
   if (!rateLimit.configured) {
@@ -299,7 +306,7 @@ async function liveAi(request, env, ctx) {
 async function augmentedHealth(request, env, ctx) {
   const response = await app.fetch(request, env, ctx);
   if (!response.ok) return response;
-  const payload = await response.json().catch(() => null);
+  const payload = await response.clone().json().catch(() => null);
   if (!payload?.ok) return response;
   return json({ ...payload, aiProviderConfigured: Boolean(env.OPENAI_API_KEY) });
 }
