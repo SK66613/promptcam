@@ -2,10 +2,13 @@ import app from './index.js';
 
 const TELEGRAM_ALLOWED_UPDATES = ['message', 'pre_checkout_query'];
 const WEBHOOK_SECRET_PATTERN = /^[A-Za-z0-9_-]{1,256}$/;
-const AI_ALLOWED_MODES = new Set(['jokes', 'director', 'ideas', 'hooks', 'critic', 'flatterer']);
+const AI_ALLOWED_MODES = new Set(['jokes', 'director', 'ideas', 'hooks', 'crew', 'acting', 'critic', 'flatterer']);
 const AI_ALLOWED_RHYTHMS = new Set(['smart', 'active']);
 const AI_ALLOWED_TRIGGERS = new Set(['scene', 'heartbeat', 'manual']);
-const AI_ALLOWED_TYPES = new Set(['joke', 'director', 'idea', 'hook', 'critic', 'praise', 'none']);
+const AI_ALLOWED_TYPES = new Set([
+  'joke', 'director', 'idea', 'hook', 'crew_director', 'crew_camera',
+  'crew_light', 'crew_actor', 'acting', 'critic', 'praise', 'none'
+]);
 const AI_FRAME_PATTERN = /^data:image\/(?:jpeg|webp);base64,[A-Za-z0-9+/=]+$/;
 const AI_MAX_REQUEST_BYTES = 800_000;
 const AI_MAX_FRAME_CHARS = 650_000;
@@ -19,7 +22,13 @@ const AI_RESPONSE_SCHEMA = {
   additionalProperties: false,
   properties: {
     action: { type: 'string', enum: ['suggest', 'none'] },
-    type: { type: 'string', enum: ['joke', 'director', 'idea', 'hook', 'critic', 'praise', 'none'] },
+    type: {
+      type: 'string',
+      enum: [
+        'joke', 'director', 'idea', 'hook', 'crew_director', 'crew_camera',
+        'crew_light', 'crew_actor', 'acting', 'critic', 'praise', 'none'
+      ]
+    },
     text: { type: 'string', maxLength: 120 },
     scene: { type: 'string', maxLength: 140 }
   },
@@ -208,6 +217,32 @@ function modeInstruction(mode) {
       'Avoid stock phrases unless they genuinely fit the scene.'
     ].join(' ');
   }
+  if (mode === 'crew') {
+    return [
+      'Act as a virtual professional film crew supervising a solo creator.',
+      'Choose exactly one specialist whose intervention is the highest-value thing to fix or reinforce right now; never output several notes at once.',
+      'Return type=crew_camera for framing, headroom, camera height, subject placement, tilt, distance, or composition.',
+      'Return type=crew_light for clearly visible lighting, backlight, harsh shadow, exposure, or subject-visibility issues.',
+      'Return type=crew_actor for observable gaze direction, head angle, shoulder or torso posture, visible gesture use, or facial expressiveness as a performance cue.',
+      'Return type=crew_director for the overall beat, pacing, reveal, prop use, or the next performance action tied to the video topic.',
+      'Pick only a clearly visible and immediately actionable point. If several things could improve, choose the most important one.',
+      'If the shot is already solid, use crew_director for a short positive hold-or-next-beat direction instead of inventing a flaw.',
+      'Use relative language such as slightly higher or a little closer; do not invent exact measurements.',
+      'Never judge appearance or body, and never infer what the creator feels internally.'
+    ].join(' ');
+  }
+  if (mode === 'acting') {
+    return [
+      'Act as an on-camera acting and body-language coach.',
+      'Return type=acting.',
+      'Give exactly one immediately actionable cue based only on what is currently visible.',
+      'Focus on gaze direction, head angle, shoulders and torso posture, visible hand or arm gestures, facial expressiveness as an observable expression, and how the visible delivery setup fits the script topic.',
+      'Phrase the line as coaching: what to do next, not a personal judgment.',
+      'If hands or body are outside the frame, do not invent information about them.',
+      'Do not diagnose emotion, personality, confidence, attractiveness, or any sensitive trait.',
+      'Never critique appearance, body shape, age, identity, disability, ethnicity, or other sensitive characteristics.'
+    ].join(' ');
+  }
   if (mode === 'critic') {
     return [
       'Act as a constructive on-camera critic.',
@@ -244,7 +279,7 @@ function rhythmInstruction(rhythm, trigger) {
     return `Active rhythm. ${heartbeat} Prefer action=suggest; use action=none only if no safe grounded line is possible.`;
   }
   const smartPrompt = trigger === 'heartbeat'
-    ? 'This is a quiet periodic check. If any concrete useful, relevant, funny, critical, or encouraging observation is available, return action=suggest. Use action=none only when a specific grounded line would add no value.'
+    ? 'This is a quiet periodic check. If any concrete useful, relevant, funny, critical, encouraging, or coaching observation is available, return action=suggest. Use action=none only when a specific grounded line would add no value.'
     : 'A meaningful scene change triggered this request. Prefer action=suggest when you can add a concrete mode-appropriate line; use action=none only when any response would be generic or forced.';
   return `Smart rhythm. ${smartPrompt}`;
 }
@@ -256,7 +291,7 @@ function contextInstruction(scriptContext, history) {
   }
   if (history.length) {
     lines.push(`Recent PromptCam outputs and scene summaries across modes, reference only: ${JSON.stringify(history)}`);
-    lines.push('Do not repeat their wording, object focus, punchline, hook pattern, criticism, compliment, or director instruction.');
+    lines.push('Do not repeat their wording, object focus, punchline, hook pattern, criticism, compliment, crew specialty, or coaching instruction.');
     lines.push('If the scene is similar, choose another visible detail or a genuinely different angle without inventing facts.');
   }
   return lines.join('\n');
@@ -271,6 +306,7 @@ function buildLiveAiPrompt(body, languageCode) {
     rhythmInstruction(body.rhythm, body.trigger),
     context,
     'Use only clear, non-sensitive visible details. Never identify people or infer private or sensitive traits.',
+    'For pose, gaze, gesture, facial-expression, or body-language advice, describe only observable positioning or expression and give a controllable next action.',
     'The line must be immediately useful on camera and normally 4-12 words. No labels, quotation marks, or explanation.',
     'If reply language is Russian, use natural conversational Russian, not literal translated phrasing.',
     'scene must be a tiny factual summary of the current visible scene only.'
