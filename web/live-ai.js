@@ -5,6 +5,8 @@
   const initData = tg?.initData || '';
   const cameraView = document.getElementById('cameraView');
   const cameraVideo = document.getElementById('cameraVideo');
+  const prompterText = document.getElementById('prompterText');
+  const resultDialog = document.getElementById('resultDialog');
   const liveAiButton = document.getElementById('liveAiButton');
   const liveAiPanel = document.getElementById('liveAiPanel');
   const liveAiPanelClose = document.getElementById('liveAiPanelClose');
@@ -33,6 +35,9 @@
   const ACTIVE_FIRST_DELAY_MS = 700;
   const ACTIVE_MIN_SUGGESTION_MS = 1600;
   const ACTIVE_RETRY_AFTER_NONE_MS = 1800;
+  const SCRIPT_CONTEXT_MAX_CHARS = 480;
+  const CONTEXT_MEMORY_LIMIT = 12;
+  const CONTEXT_REQUEST_LIMIT = 4;
   const PIXEL_CHANGE_THRESHOLD = 24;
   const MEAN_CHANGE_THRESHOLD = 10;
   const CHANGED_RATIO_THRESHOLD = 0.16;
@@ -40,6 +45,7 @@
 
   const state = {
     enabled: false,
+    suspended: false,
     mode: readStoredMode(),
     rhythm: readStoredRhythm(),
     busy: false,
@@ -64,6 +70,7 @@
   sampleCanvas.height = SAMPLE_HEIGHT;
   const sampleContext = sampleCanvas.getContext('2d', { alpha: false, willReadFrequently: true });
 
+  const contextMemory = [];
   let previousSample = null;
   let sampleTimer = 0;
   let suggestionTimer = 0;
@@ -72,6 +79,7 @@
   let suggestionType = null;
   let suggestionText = null;
   let rhythmButtons = [];
+  let resumeAfterResult = false;
 
   function readStoredMode() {
     try {
@@ -96,14 +104,45 @@
     catch (_) { /* Storage is optional in private browsing. */ }
   }
 
+  function normalizeContextText(value, maxLength) {
+    if (typeof value !== 'string') return '';
+    return value.replace(/\s+/g, ' ').trim().slice(0, maxLength);
+  }
+
+  function currentScriptContext() {
+    return normalizeContextText(prompterText?.textContent || '', SCRIPT_CONTEXT_MAX_CHARS);
+  }
+
+  function recentContextForMode() {
+    return contextMemory
+      .filter((item) => item.mode === state.mode)
+      .slice(-CONTEXT_REQUEST_LIMIT)
+      .map(({ type, text, scene }) => ({ type, text, scene }));
+  }
+
+  function rememberResult(result) {
+    const scene = normalizeContextText(result?.scene || '', 140);
+    const text = normalizeContextText(result?.text || '', 120);
+    const type = ['joke', 'director', 'idea', 'hook', 'none'].includes(result?.type) ? result.type : 'none';
+    if (!scene && !text) return;
+    contextMemory.push({ mode: state.mode, type, text, scene });
+    if (contextMemory.length > CONTEXT_MEMORY_LIMIT) {
+      contextMemory.splice(0, contextMemory.length - CONTEXT_MEMORY_LIMIT);
+    }
+  }
+
+  function clearContextMemory() {
+    contextMemory.length = 0;
+  }
+
   function upgradeFoundationCopy() {
     const badge = liveAiPanel?.querySelector('.live-ai-badge');
     const copy = liveAiPanel?.querySelector('.live-ai-copy');
     const toggleHint = liveAiToggle?.querySelector('small');
     const modeLabel = liveAiPanel?.querySelector('.live-ai-mode-label');
     if (badge) badge.textContent = 'BETA';
-    if (copy) copy.textContent = 'PromptCam замечает изменения сцены локально. Выбери, что говорить и насколько часто вмешиваться.';
-    if (toggleHint) toggleHint.textContent = 'Живые подсказки по происходящему';
+    if (copy) copy.textContent = 'AI Live использует компактный кадр, короткий контекст сценария и несколько последних реплик. PromptCam их не сохраняет.';
+    if (toggleHint) toggleHint.textContent = 'Живые подсказки по сцене и теме ролика';
     if (modeLabel) modeLabel.textContent = 'ЧТО ГОВОРИТЬ';
   }
 
@@ -215,6 +254,7 @@
   function getStatus() {
     return {
       enabled: state.enabled,
+      suspended: state.suspended,
       mode: state.mode,
       rhythm: state.rhythm,
       busy: state.busy,
@@ -229,7 +269,8 @@
       frameSequence: state.frameSequence,
       sceneVersion: state.sceneVersion,
       pendingSceneChange: state.pendingSceneChange,
-      backoffUntil: state.backoffUntil
+      backoffUntil: state.backoffUntil,
+      contextItems: contextMemory.length
     };
   }
 
@@ -355,6 +396,7 @@
   }
 
   function showSuggestion(result) {
+    if (state.suspended || resultDialog?.open) return;
     ensureSuggestionCard();
     if (!suggestionCard || !suggestionText || !suggestionType) return;
     suggestionType.textContent = modeLabel(result.type);
@@ -375,6 +417,8 @@
         mode: state.mode,
         rhythm: state.rhythm,
         trigger: triggerType,
+        scriptContext: currentScriptContext(),
+        history: recentContextForMode(),
         frame: frameDataUrl
       }),
       cache: 'no-store',
@@ -403,19 +447,49 @@
   }
 
   function scheduleAdaptiveTick(delay = SAMPLE_INTERVAL_MS) {
-    if (!state.enabled || sampleTimer) return;
+    if (!state.enabled || state.suspended || sampleTimer) return;
     state.running = true;
     sampleTimer = window.setTimeout(adaptiveTick, Math.max(0, delay));
   }
 
   function disableWithStatus(message, tone = 'error') {
+    resumeAfterResult = false;
     state.enabled = false;
+    state.suspended = false;
     state.busy = false;
     stopAdaptiveLoop();
     hideSuggestion();
     render();
     setStatus(message, tone);
     emitState();
+  }
+
+  function suspendForResult() {
+    if (!state.enabled || state.suspended) return;
+    resumeAfterResult = true;
+    state.suspended = true;
+    state.busy = false;
+    stopAdaptiveLoop();
+    closePanel();
+    hideSuggestion();
+    setStatus('AI Live на паузе, пока открыт результат.');
+    emitState();
+  }
+
+  function resumeFromResult() {
+    if (!resumeAfterResult || !state.enabled) return;
+    requestAnimationFrame(() => {
+      if (!resumeAfterResult || !state.enabled || resultDialog?.open || cameraView?.classList.contains('hidden')) return;
+      resumeAfterResult = false;
+      state.suspended = false;
+      previousSample = null;
+      state.pendingSceneChange = false;
+      setStatus(state.rhythm === 'active'
+        ? 'AI Live снова активен · готовлю следующую реплику'
+        : 'AI Live снова активен · жду изменения сцены');
+      emitState();
+      startAdaptiveLoop();
+    });
   }
 
   function handleRequestError(error) {
@@ -446,7 +520,7 @@
   }
 
   async function requestSuggestion({ force = false, trigger = 'scene' } = {}) {
-    if (!state.enabled || state.busy || document.hidden) return false;
+    if (!state.enabled || state.suspended || state.busy || document.hidden || resultDialog?.open) return false;
     if (!initData) {
       disableWithStatus('AI Live сейчас доступен внутри Telegram Mini App.');
       return false;
@@ -473,11 +547,11 @@
 
     try {
       const frame = await captureFrame();
-      if (!state.enabled) return false;
+      if (!state.enabled || state.suspended) return false;
       const frameDataUrl = await blobToDataUrl(frame.blob);
-      if (!state.enabled) return false;
+      if (!state.enabled || state.suspended) return false;
       const result = await postLiveAi(frameDataUrl, activeController.signal, trigger);
-      if (!state.enabled) return false;
+      if (!state.enabled || state.suspended || resultDialog?.open) return false;
 
       state.lastLatencyMs = Number(result?.latency?.totalMs || (Date.now() - requestStartedAt));
 
@@ -489,6 +563,8 @@
         setStatus(`Сцена уже изменилась · обновляю контекст · ${formatLatency(state.lastLatencyMs)}`);
         return false;
       }
+
+      rememberResult(result);
 
       if (result.action === 'suggest' && typeof result.text === 'string' && result.text.trim()) {
         state.lastSuggestionAt = Date.now();
@@ -511,22 +587,22 @@
       activeController = null;
       render();
       emitState();
-      if (state.enabled && state.rhythm === 'smart' && state.pendingSceneChange) scheduleAdaptiveTick(40);
+      if (state.enabled && !state.suspended && state.rhythm === 'smart' && state.pendingSceneChange) scheduleAdaptiveTick(40);
     }
   }
 
   function activeHeartbeatDue(now = Date.now()) {
-    return state.rhythm === 'active' && !state.busy && state.activeNextAt > 0 && now >= state.activeNextAt;
+    return state.rhythm === 'active' && !state.suspended && !state.busy && state.activeNextAt > 0 && now >= state.activeNextAt;
   }
 
   function adaptiveTick() {
     sampleTimer = 0;
-    if (!state.enabled) {
+    if (!state.enabled || state.suspended || resultDialog?.open) {
       state.running = false;
       return;
     }
     if (document.hidden || cameraView?.classList.contains('hidden')) {
-      scheduleAdaptiveTick(700);
+      state.running = false;
       return;
     }
 
@@ -559,6 +635,7 @@
 
   function startAdaptiveLoop() {
     stopAdaptiveLoop({ abort: false });
+    if (state.suspended || !state.enabled) return;
     state.pendingSceneChange = false;
     state.backoffUntil = 0;
     state.activeNextAt = state.rhythm === 'active'
@@ -569,7 +646,9 @@
 
   async function setEnabled(enabled) {
     if (!enabled) {
+      resumeAfterResult = false;
       state.enabled = false;
+      state.suspended = false;
       state.busy = false;
       stopAdaptiveLoop();
       hideSuggestion();
@@ -584,10 +663,18 @@
       return;
     }
 
+    resumeAfterResult = false;
     state.enabled = true;
+    state.suspended = Boolean(resultDialog?.open);
     previousSample = null;
     state.pendingSceneChange = false;
     render();
+    if (state.suspended) {
+      resumeAfterResult = true;
+      setStatus('AI Live включён, но на паузе до закрытия результата.');
+      emitState();
+      return;
+    }
     setStatus(state.rhythm === 'active'
       ? 'AI Live готов · первая активная реплика через секунду'
       : 'AI Live готов · в умном ритме AI может решить промолчать');
@@ -604,11 +691,11 @@
     state.activeNextAt = state.rhythm === 'active' ? Date.now() + ACTIVE_FIRST_DELAY_MS : 0;
     hideSuggestion();
     render();
-    if (state.enabled) setStatus(state.rhythm === 'active'
+    if (state.enabled && !state.suspended) setStatus(state.rhythm === 'active'
       ? 'Режим изменён · готовлю новую реплику'
       : 'Режим изменён · жду следующего момента');
     emitState();
-    if (state.enabled) scheduleAdaptiveTick(40);
+    if (state.enabled && !state.suspended) scheduleAdaptiveTick(40);
     return true;
   }
 
@@ -620,7 +707,7 @@
     state.activeNextAt = rhythm === 'active' ? Date.now() + ACTIVE_FIRST_DELAY_MS : 0;
     hideSuggestion();
     render();
-    if (state.enabled) {
+    if (state.enabled && !state.suspended) {
       setStatus(rhythm === 'active'
         ? 'Активный ритм · говорю примерно каждые 3–4 секунды'
         : 'Умный ритм · AI говорит только когда видит смысл');
@@ -631,7 +718,7 @@
   }
 
   function requestNow() {
-    if (!state.enabled) return false;
+    if (!state.enabled || state.suspended) return false;
     state.sceneVersion += 1;
     state.pendingSceneChange = true;
     requestSuggestion({ force: true, trigger: 'manual' });
@@ -639,9 +726,12 @@
   }
 
   function resetForCameraExit() {
+    resumeAfterResult = false;
     state.enabled = false;
+    state.suspended = false;
     state.busy = false;
     stopAdaptiveLoop();
+    clearContextMemory();
     closePanel();
     hideSuggestion();
     render();
@@ -666,12 +756,12 @@
   backButton?.addEventListener('click', resetForCameraExit, { capture: true });
   window.addEventListener('pagehide', resetForCameraExit);
   document.addEventListener('visibilitychange', () => {
-    if (!state.enabled) return;
+    if (!state.enabled || state.suspended) return;
     if (document.hidden) {
       window.clearTimeout(sampleTimer);
       sampleTimer = 0;
       state.running = false;
-    } else {
+    } else if (!resultDialog?.open && !cameraView?.classList.contains('hidden')) {
       previousSample = null;
       state.pendingSceneChange = false;
       state.activeNextAt = state.rhythm === 'active' ? Date.now() + ACTIVE_FIRST_DELAY_MS : 0;
@@ -679,10 +769,23 @@
     }
   });
 
+  if (resultDialog) {
+    const resultObserver = new MutationObserver(() => {
+      if (resultDialog.open) suspendForResult();
+      else resumeFromResult();
+    });
+    resultObserver.observe(resultDialog, { attributes: true, attributeFilter: ['open'] });
+    resultDialog.addEventListener('close', resumeFromResult);
+  }
+
   if (cameraView) {
     const observer = new MutationObserver(() => {
+      if (cameraView.classList.contains('hidden')) {
+        if (state.enabled) resetForCameraExit();
+        return;
+      }
       if (cameraView.classList.contains('is-recording')) closePanel();
-      if (!cameraView.classList.contains('hidden') && state.enabled) scheduleAdaptiveTick(70);
+      if (state.enabled && !state.suspended && !resultDialog?.open) scheduleAdaptiveTick(70);
     });
     observer.observe(cameraView, { attributes: true, attributeFilter: ['class'] });
   }
@@ -694,6 +797,8 @@
     setMode,
     setRhythm,
     requestNow,
+    suspendForResult,
+    resumeFromResult,
     openPanel,
     closePanel,
     resetForCameraExit,
