@@ -390,6 +390,7 @@
       analyser = audioContext.createAnalyser();
       analyser.fftSize = 512;
       analyser.smoothingTimeConstant = 0.15;
+      analyserBuffer = new Float32Array(analyser.fftSize);
       silentGain = audioContext.createGain();
       silentGain.gain.value = 0;
       audioSource.connect(analyser);
