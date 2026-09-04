@@ -3,6 +3,7 @@
 
   const STORAGE_KEY = 'promptcam.live-ai.presentation-style.v1';
   const COACHING_MODES = new Set(['crew', 'acting']);
+  const SPEECH_CONTEXT_MAX_CHARS = 700;
   const STYLES = [
     ['calm', '😌 Спокойный', 'Стабильно и мягко'],
     ['energetic', '⚡ Энергичный', 'Живее и выразительнее'],
@@ -102,12 +103,28 @@
     }
   }
 
+  function recentSpeechContext() {
+    try {
+      const context = window.PromptCamSpeechContext?.getContext?.();
+      const text = typeof context?.text === 'string'
+        ? context.text.replace(/\s+/g, ' ').trim().slice(-SPEECH_CONTEXT_MAX_CHARS)
+        : '';
+      if (!text) return null;
+      const spanMs = Math.max(0, Math.min(35_000, Math.round(Number(context?.spanMs || 0))));
+      return { text, spanMs };
+    } catch (_) {
+      return null;
+    }
+  }
+
   window.fetch = function promptCamStyleFetch(input, init = {}) {
     if (!isLiveAiRequest(input) || typeof init?.body !== 'string') return originalFetch(input, init);
     try {
       const payload = JSON.parse(init.body);
       if (COACHING_MODES.has(payload?.mode)) {
         payload.presentationStyle = selectedStyle;
+        const speechContext = recentSpeechContext();
+        if (speechContext) payload.speechContext = speechContext;
         return originalFetch(input, { ...init, body: JSON.stringify(payload) });
       }
     } catch (_) {
