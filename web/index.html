@@ -13,6 +13,7 @@
   <link rel="stylesheet" href="/style.css" />
   <link rel="stylesheet" href="/telegram.css" />
   <link rel="stylesheet" href="/theme-cinematic.css" />
+  <link rel="stylesheet" href="/billing.css" />
 </head>
 <body>
   <svg class="svg-sprite" aria-hidden="true">
@@ -149,15 +150,33 @@
       <div class="result-actions">
         <button id="shareButton" class="primary-button" type="button"><svg><use href="#i-share"/></svg>Сохранить / поделиться</button>
         <a id="downloadButton" class="secondary-button" download="promptcam-video.mp4"><svg><use href="#i-download"/></svg>Скачать файл</a>
-        <button id="retryButton" class="secondary-button" type="button">Записать ещё раз</button>
-        <button id="returnToTextButton" class="text-button" type="button">Вернуться к тексту</button>
+        <button id="upgradeButton" class="pro-button" type="button">
+          <strong>⭐ Получить PromptCam Pro</strong>
+          <small>Следующие записи — без водяного знака</small>
+        </button>
+        <button id="retryButton" class="secondary-button result-flow-helper" type="button">Записать ещё раз</button>
+        <button id="returnToTextButton" class="text-button result-flow-helper" type="button">Вернуться к тексту</button>
       </div>
+      <p id="resultAccessStatus" class="result-access-status hidden" aria-live="polite"></p>
       <p id="shareFallback" class="result-note hidden">Поделиться файлом здесь нельзя. Нажми «Скачать файл», затем поделись им из приложения «Фото» или «Файлы».</p>
     </div>
   </dialog>
 
+  <dialog id="paywallDialog" class="paywall-dialog">
+    <section class="paywall-card" aria-labelledby="paywallTitle">
+      <button id="paywallClose" class="paywall-close" type="button" aria-label="Закрыть">×</button>
+      <p class="paywall-kicker">PROMPTCAM PRO</p>
+      <h2 id="paywallTitle">Записывай без водяного знака</h2>
+      <p class="paywall-lead">Выбери срок доступа. Оплата проходит внутри Telegram через Stars — без карт и дополнительных форм.</p>
+      <div id="planList" class="plan-list" aria-label="Тарифы PromptCam Pro"></div>
+      <p id="paywallStatus" class="paywall-status hidden" role="status" aria-live="polite"></p>
+      <p class="paywall-footnote">30 дней — подписка с автопродлением каждые 30 дней. Остальные варианты — разовая покупка доступа.</p>
+    </section>
+  </dialog>
+
   <script src="/telegram.js" defer></script>
   <script src="/watermark.js" defer></script>
+  <script src="/billing.js" defer></script>
   <script src="/app.js" defer></script>
 </body>
 </html>

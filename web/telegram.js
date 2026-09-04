@@ -36,6 +36,7 @@
   const editor = byId('editorView');
   const camera = byId('cameraView');
   const dialog = byId('resultDialog');
+  const paywall = byId('paywallDialog');
   const backButton = byId('backButton');
   const retryButton = byId('retryButton');
   const openCameraButton = byId('openCameraButton');
@@ -74,7 +75,7 @@
   }
 
   function syncTelegramChrome() {
-    const insideFlow = Boolean(dialog?.open || cameraIsOpen());
+    const insideFlow = Boolean(paywall?.open || dialog?.open || cameraIsOpen());
     if (insideFlow) safe(() => tg.BackButton.show());
     else safe(() => tg.BackButton.hide());
 
@@ -86,6 +87,10 @@
   }
 
   function handleTelegramBack() {
+    if (paywall?.open) {
+      paywall.close();
+      return;
+    }
     if (dialog?.open && retryButton) {
       retryButton.click();
       return;
@@ -103,6 +108,7 @@
   if (editor) observer.observe(editor, { attributes: true, attributeFilter: ['class', 'aria-hidden'] });
   if (camera) observer.observe(camera, { attributes: true, attributeFilter: ['class', 'aria-hidden'] });
   if (dialog) observer.observe(dialog, { attributes: true, attributeFilter: ['open'] });
+  if (paywall) observer.observe(paywall, { attributes: true, attributeFilter: ['open'] });
 
   openCameraButton?.addEventListener('click', () => {
     safe(() => tg.HapticFeedback?.impactOccurred('light'));
