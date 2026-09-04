@@ -6,6 +6,7 @@
   const cameraView = document.getElementById('cameraView');
   const cameraVideo = document.getElementById('cameraVideo');
   const prompterText = document.getElementById('prompterText');
+  const resultDialog = document.getElementById('resultDialog');
   const liveAiStatus = document.getElementById('liveAiStatus');
 
   const SPEECH_MODES = new Set(['crew', 'acting']);
@@ -42,6 +43,7 @@
   let audioContext = null;
   let audioSource = null;
   let analyser = null;
+  let silentGain = null;
   let analyserBuffer = null;
   let vadTimer = 0;
   let voiceHits = 0;
@@ -66,6 +68,7 @@
       !live?.suspended &&
       SPEECH_MODES.has(live.mode) &&
       !document.hidden &&
+      !resultDialog?.open &&
       cameraView &&
       !cameraView.classList.contains('hidden')
     );
@@ -387,8 +390,11 @@
       analyser = audioContext.createAnalyser();
       analyser.fftSize = 512;
       analyser.smoothingTimeConstant = 0.15;
-      analyserBuffer = new Float32Array(analyser.fftSize);
+      silentGain = audioContext.createGain();
+      silentGain.gain.value = 0;
       audioSource.connect(analyser);
+      analyser.connect(silentGain);
+      silentGain.connect(audioContext.destination);
       await audioContext.resume().catch(() => {});
       speechTrack.addEventListener('ended', stopListening, { once: true });
       state.active = true;
@@ -418,8 +424,11 @@
     if (uploadController) uploadController.abort();
     uploadController = null;
     try { audioSource?.disconnect(); } catch (_) { /* Optional cleanup. */ }
+    try { analyser?.disconnect(); } catch (_) { /* Optional cleanup. */ }
+    try { silentGain?.disconnect(); } catch (_) { /* Optional cleanup. */ }
     audioSource = null;
     analyser = null;
+    silentGain = null;
     analyserBuffer = null;
     if (audioContext) audioContext.close().catch(() => {});
     audioContext = null;
@@ -441,11 +450,19 @@
       startListening();
       return;
     }
-    if (state.active || recorder || uploadController) stopListening({ clearContext: false });
     const live = liveState();
+    const clearContext = Boolean(
+      !live?.enabled ||
+      live?.suspended ||
+      resultDialog?.open ||
+      cameraView?.classList.contains('hidden')
+    );
+    if (state.active || recorder || uploadController || (clearContext && state.segments.length)) {
+      stopListening({ clearContext });
+    }
     if (!live?.enabled) setStatus('🎙 Speech Context включится вместе с AI Live.');
     else if (!SPEECH_MODES.has(live.mode)) setStatus('🎙 Речь слушаю только в Съёмочной группе и Актёрском коуче.');
-    else if (live.suspended) setStatus('🎙 Speech Context на паузе вместе с AI Live.');
+    else if (live.suspended || resultDialog?.open) setStatus('🎙 Speech Context на паузе · память дубля очищена.');
   }
 
   function reset() {
@@ -460,6 +477,11 @@
     if (document.hidden) stopListening({ clearContext: false });
     else syncListening();
   });
+
+  if (resultDialog) {
+    const resultObserver = new MutationObserver(syncListening);
+    resultObserver.observe(resultDialog, { attributes: true, attributeFilter: ['open'] });
+  }
 
   if (cameraView) {
     const observer = new MutationObserver(() => {
