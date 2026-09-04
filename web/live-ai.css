@@ -1,4 +1,5 @@
 .live-ai-panel[hidden] { display: none !important; }
+.live-ai-suggestion.hidden { display: none !important; }
 
 .camera-tool-button.live-ai-tool.is-active {
   border-color: rgba(145, 105, 255, .58);
@@ -7,6 +8,17 @@
 }
 .camera-tool-button.live-ai-tool.is-active span { color: #fff; }
 .camera-tool-button.live-ai-tool.is-active svg { filter: drop-shadow(0 0 8px rgba(216,202,255,.7)); }
+.camera-tool-button.live-ai-tool.is-active::after {
+  content: "";
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #8ff0b5;
+  box-shadow: 0 0 10px rgba(119,239,163,.72);
+}
 
 .live-ai-panel {
   position: absolute;
@@ -141,9 +153,63 @@
 .live-ai-status[data-tone="success"] { color: #84dea6; }
 .live-ai-status[data-tone="error"] { color: #ff9da8; }
 
+.live-ai-suggestion {
+  position: absolute;
+  z-index: 16;
+  left: max(14px, var(--app-safe-left));
+  bottom: calc(128px + var(--app-safe-bottom));
+  width: min(360px, calc(100vw - 104px - var(--app-safe-left) - var(--app-safe-right)));
+  padding: 11px 12px 12px;
+  border: 1px solid rgba(149, 114, 255, .34);
+  border-radius: 17px;
+  background: linear-gradient(145deg, rgba(24,19,40,.94), rgba(10,13,28,.91));
+  box-shadow: 0 18px 48px rgba(0,0,0,.48), 0 0 30px rgba(103,68,255,.15);
+  color: #fff;
+  backdrop-filter: blur(18px) saturate(125%);
+  -webkit-backdrop-filter: blur(18px) saturate(125%);
+  animation: liveAiSuggestionIn .2s ease-out both;
+}
+.live-ai-suggestion-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 5px;
+}
+.live-ai-suggestion-type {
+  color: #bba6ff;
+  font-size: 9px;
+  font-weight: 820;
+  letter-spacing: .04em;
+}
+.live-ai-suggestion-close {
+  width: 25px;
+  height: 25px;
+  border: 0;
+  border-radius: 9px;
+  background: rgba(255,255,255,.055);
+  color: #aaa5b8;
+  font-size: 17px;
+  line-height: 1;
+}
+.live-ai-suggestion-text {
+  margin: 0;
+  color: #f8f5ff;
+  font-size: clamp(15px, 4.15vw, 18px);
+  font-weight: 720;
+  line-height: 1.28;
+  text-wrap: pretty;
+  text-shadow: 0 2px 10px rgba(0,0,0,.42);
+}
+
 .camera-screen.is-recording .live-ai-panel {
   visibility: hidden;
   pointer-events: none;
+}
+
+@keyframes liveAiSuggestionIn {
+  from { opacity: 0; transform: translateY(8px) scale(.985); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
 @media (max-height: 690px) {
@@ -154,6 +220,7 @@
   .live-ai-copy { margin: 7px 0 9px; }
   .live-ai-mode-label { margin-top: 9px; }
   .live-ai-status { margin-top: 7px; }
+  .live-ai-suggestion { bottom: calc(109px + var(--app-safe-bottom)); }
 }
 
 @media (max-width: 360px) {
@@ -162,4 +229,7 @@
     width: min(268px, calc(100vw - 90px - var(--app-safe-left) - var(--app-safe-right)));
   }
   .live-ai-modes { grid-template-columns: 1fr; }
+  .live-ai-suggestion {
+    width: min(260px, calc(100vw - 96px - var(--app-safe-left) - var(--app-safe-right)));
+  }
 }
