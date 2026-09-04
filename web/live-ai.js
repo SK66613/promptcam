@@ -13,7 +13,7 @@
   const liveAiToggle = document.getElementById('liveAiToggle');
   const liveAiToggleValue = document.getElementById('liveAiToggleValue');
   const liveAiStatus = document.getElementById('liveAiStatus');
-  const modeButtons = [...document.querySelectorAll('[data-live-ai-mode]')];
+  let modeButtons = [...document.querySelectorAll('[data-live-ai-mode]')];
   const cameraSettingsToggle = document.getElementById('cameraSettingsToggle');
   const cameraSettings = document.getElementById('cameraSettings');
   const switchCameraButton = document.getElementById('switchCameraButton');
@@ -21,7 +21,8 @@
 
   const MODE_STORAGE_KEY = 'promptcam.live-ai.mode.v1';
   const RHYTHM_STORAGE_KEY = 'promptcam.live-ai.rhythm.v1';
-  const VALID_MODES = new Set(['jokes', 'director', 'ideas', 'hooks']);
+  const VALID_MODES = new Set(['jokes', 'director', 'ideas', 'hooks', 'critic', 'flatterer']);
+  const VALID_TYPES = new Set(['joke', 'director', 'idea', 'hook', 'critic', 'praise', 'none']);
   const VALID_RHYTHMS = new Set(['smart', 'active']);
   const CAPTURE_MAX_EDGE = 384;
   const CAPTURE_QUALITY = 0.62;
@@ -35,9 +36,12 @@
   const ACTIVE_FIRST_DELAY_MS = 700;
   const ACTIVE_MIN_SUGGESTION_MS = 1600;
   const ACTIVE_RETRY_AFTER_NONE_MS = 1800;
-  const SCRIPT_CONTEXT_MAX_CHARS = 480;
-  const CONTEXT_MEMORY_LIMIT = 12;
-  const CONTEXT_REQUEST_LIMIT = 4;
+  const SMART_CADENCE_MS = 8500;
+  const SMART_FIRST_DELAY_MS = 4000;
+  const SMART_RETRY_AFTER_NONE_MS = 5000;
+  const SCRIPT_CONTEXT_MAX_CHARS = 1200;
+  const CONTEXT_MEMORY_LIMIT = 24;
+  const CONTEXT_REQUEST_LIMIT = 8;
   const PIXEL_CHANGE_THRESHOLD = 24;
   const MEAN_CHANGE_THRESHOLD = 10;
   const CHANGED_RATIO_THRESHOLD = 0.16;
@@ -57,6 +61,7 @@
     lastLatencyMs: 0,
     lastRequestTrigger: '',
     activeNextAt: 0,
+    smartNextAt: 0,
     frameSequence: 0,
     sceneVersion: 0,
     pendingSceneChange: false,
@@ -113,17 +118,16 @@
     return normalizeContextText(prompterText?.textContent || '', SCRIPT_CONTEXT_MAX_CHARS);
   }
 
-  function recentContextForMode() {
+  function recentContext() {
     return contextMemory
-      .filter((item) => item.mode === state.mode)
       .slice(-CONTEXT_REQUEST_LIMIT)
-      .map(({ type, text, scene }) => ({ type, text, scene }));
+      .map(({ mode, type, text, scene }) => ({ mode, type, text, scene }));
   }
 
   function rememberResult(result) {
     const scene = normalizeContextText(result?.scene || '', 140);
     const text = normalizeContextText(result?.text || '', 120);
-    const type = ['joke', 'director', 'idea', 'hook', 'none'].includes(result?.type) ? result.type : 'none';
+    const type = VALID_TYPES.has(result?.type) ? result.type : 'none';
     if (!scene && !text) return;
     contextMemory.push({ mode: state.mode, type, text, scene });
     if (contextMemory.length > CONTEXT_MEMORY_LIMIT) {
@@ -141,9 +145,29 @@
     const toggleHint = liveAiToggle?.querySelector('small');
     const modeLabel = liveAiPanel?.querySelector('.live-ai-mode-label');
     if (badge) badge.textContent = 'BETA';
-    if (copy) copy.textContent = 'AI Live использует компактный кадр, короткий контекст сценария и несколько последних реплик. PromptCam их не сохраняет.';
+    if (copy) copy.textContent = 'AI Live учитывает кадр, расширенный контекст сценария и до 8 последних AI-реакций. PromptCam их не сохраняет.';
     if (toggleHint) toggleHint.textContent = 'Живые подсказки по сцене и теме ролика';
     if (modeLabel) modeLabel.textContent = 'ЧТО ГОВОРИТЬ';
+  }
+
+  function ensureModeControls() {
+    const modes = liveAiPanel?.querySelector('.live-ai-modes');
+    if (!modes) return;
+    const extras = [
+      ['critic', '🧐 Критик'],
+      ['flatterer', '😎 Льстец']
+    ];
+    for (const [mode, label] of extras) {
+      if (modes.querySelector(`[data-live-ai-mode="${mode}"]`)) continue;
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'live-ai-mode';
+      button.dataset.liveAiMode = mode;
+      button.setAttribute('aria-pressed', 'false');
+      button.textContent = label;
+      modes.append(button);
+    }
+    modeButtons = [...modes.querySelectorAll('[data-live-ai-mode]')];
   }
 
   function ensureRhythmControls() {
@@ -160,7 +184,7 @@
     group.setAttribute('aria-label', 'Ритм AI Live');
 
     const definitions = [
-      ['smart', 'Умный', 'Говорит, когда есть смысл'],
+      ['smart', 'Умный', 'Реагирует на сцену + иногда сам'],
       ['active', 'Активный', 'Говорит примерно каждые 3–4 сек']
     ];
 
@@ -266,6 +290,7 @@
       lastLatencyMs: state.lastLatencyMs,
       lastRequestTrigger: state.lastRequestTrigger,
       activeNextAt: state.activeNextAt,
+      smartNextAt: state.smartNextAt,
       frameSequence: state.frameSequence,
       sceneVersion: state.sceneVersion,
       pendingSceneChange: state.pendingSceneChange,
@@ -386,6 +411,8 @@
     if (type === 'idea') return '💡 Идея';
     if (type === 'hook') return '🎣 Хук';
     if (type === 'joke') return '😄 Шутка';
+    if (type === 'critic') return '🧐 Критик';
+    if (type === 'praise') return '😎 Льстец';
     return '✨ AI Live';
   }
 
@@ -418,7 +445,7 @@
         rhythm: state.rhythm,
         trigger: triggerType,
         scriptContext: currentScriptContext(),
-        history: recentContextForMode(),
+        history: recentContext(),
         frame: frameDataUrl
       }),
       cache: 'no-store',
@@ -441,6 +468,7 @@
     state.running = false;
     state.pendingSceneChange = false;
     state.activeNextAt = 0;
+    state.smartNextAt = 0;
     previousSample = null;
     if (abort && activeController) activeController.abort();
     activeController = null;
@@ -486,7 +514,7 @@
       state.pendingSceneChange = false;
       setStatus(state.rhythm === 'active'
         ? 'AI Live снова активен · готовлю следующую реплику'
-        : 'AI Live снова активен · жду изменения сцены');
+        : 'AI Live снова активен · реагирую на сцену и иногда проверяю сам');
       emitState();
       startAdaptiveLoop();
     });
@@ -499,6 +527,7 @@
       const retrySeconds = Math.max(2, Number(error.retryAfter || 5));
       state.backoffUntil = now + retrySeconds * 1000;
       if (state.rhythm === 'active') state.activeNextAt = state.backoffUntil;
+      else state.smartNextAt = state.backoffUntil;
       setStatus(`AI сделал короткую паузу · ${retrySeconds} с`, 'error');
       return;
     }
@@ -516,6 +545,7 @@
     }
     state.backoffUntil = now + 2500;
     if (state.rhythm === 'active') state.activeNextAt = state.backoffUntil;
+    else state.smartNextAt = state.backoffUntil;
     setStatus('AI временно не ответил. Продолжаю наблюдать локально…', 'error');
   }
 
@@ -541,6 +571,7 @@
     state.lastRequestAt = now;
     state.lastRequestTrigger = trigger;
     if (state.rhythm === 'active') state.activeNextAt = now + ACTIVE_CADENCE_MS;
+    else state.smartNextAt = now + SMART_CADENCE_MS;
     activeController = new AbortController();
     render();
     emitState();
@@ -571,9 +602,10 @@
         showSuggestion(result);
         setStatus(state.rhythm === 'active'
           ? `Активный · ответ ${formatLatency(state.lastLatencyMs)}`
-          : `AI Live · ответ ${formatLatency(state.lastLatencyMs)}`, 'success');
+          : `Умный · ответ ${formatLatency(state.lastLatencyMs)}`, 'success');
       } else if (state.rhythm === 'smart') {
-        setStatus(`AI посмотрел · решил промолчать · ${formatLatency(state.lastLatencyMs)}`);
+        state.smartNextAt = Date.now() + SMART_RETRY_AFTER_NONE_MS;
+        setStatus(`AI посмотрел · пока без реплики · ${formatLatency(state.lastLatencyMs)}`);
       } else {
         state.activeNextAt = Date.now() + ACTIVE_RETRY_AFTER_NONE_MS;
         setStatus(`AI пропустил кадр · следующая реплика скоро · ${formatLatency(state.lastLatencyMs)}`);
@@ -593,6 +625,10 @@
 
   function activeHeartbeatDue(now = Date.now()) {
     return state.rhythm === 'active' && !state.suspended && !state.busy && state.activeNextAt > 0 && now >= state.activeNextAt;
+  }
+
+  function smartHeartbeatDue(now = Date.now()) {
+    return state.rhythm === 'smart' && !state.suspended && !state.busy && !state.pendingSceneChange && state.smartNextAt > 0 && now >= state.smartNextAt;
   }
 
   function adaptiveTick() {
@@ -629,8 +665,20 @@
       if (previousSample && activeHeartbeatDue()) requestSuggestion({ trigger: 'heartbeat' });
     } else if (state.pendingSceneChange && !state.busy) {
       requestSuggestion({ trigger: 'scene' });
+    } else if (previousSample && smartHeartbeatDue()) {
+      requestSuggestion({ trigger: 'heartbeat' });
     }
     scheduleAdaptiveTick();
+  }
+
+  function resetCadenceTimers(first = false) {
+    const now = Date.now();
+    state.activeNextAt = state.rhythm === 'active'
+      ? now + (first ? ACTIVE_FIRST_DELAY_MS : ACTIVE_CADENCE_MS)
+      : 0;
+    state.smartNextAt = state.rhythm === 'smart'
+      ? now + (first ? SMART_FIRST_DELAY_MS : SMART_CADENCE_MS)
+      : 0;
   }
 
   function startAdaptiveLoop() {
@@ -638,9 +686,7 @@
     if (state.suspended || !state.enabled) return;
     state.pendingSceneChange = false;
     state.backoffUntil = 0;
-    state.activeNextAt = state.rhythm === 'active'
-      ? Date.now() + ACTIVE_FIRST_DELAY_MS
-      : 0;
+    resetCadenceTimers(true);
     scheduleAdaptiveTick(60);
   }
 
@@ -677,7 +723,7 @@
     }
     setStatus(state.rhythm === 'active'
       ? 'AI Live готов · первая активная реплика через секунду'
-      : 'AI Live готов · в умном ритме AI может решить промолчать');
+      : 'AI Live готов · реагирую на сцену и иногда проверяю сам');
     emitState();
     startAdaptiveLoop();
   }
@@ -688,12 +734,12 @@
     storeValue(MODE_STORAGE_KEY, mode);
     previousSample = null;
     state.pendingSceneChange = false;
-    state.activeNextAt = state.rhythm === 'active' ? Date.now() + ACTIVE_FIRST_DELAY_MS : 0;
+    resetCadenceTimers(true);
     hideSuggestion();
     render();
     if (state.enabled && !state.suspended) setStatus(state.rhythm === 'active'
       ? 'Режим изменён · готовлю новую реплику'
-      : 'Режим изменён · жду следующего момента');
+      : 'Режим изменён · реагирую на сцену и скоро проверю сам');
     emitState();
     if (state.enabled && !state.suspended) scheduleAdaptiveTick(40);
     return true;
@@ -704,13 +750,13 @@
     state.rhythm = rhythm;
     storeValue(RHYTHM_STORAGE_KEY, rhythm);
     state.pendingSceneChange = false;
-    state.activeNextAt = rhythm === 'active' ? Date.now() + ACTIVE_FIRST_DELAY_MS : 0;
+    resetCadenceTimers(true);
     hideSuggestion();
     render();
     if (state.enabled && !state.suspended) {
       setStatus(rhythm === 'active'
         ? 'Активный ритм · говорю примерно каждые 3–4 секунды'
-        : 'Умный ритм · AI говорит только когда видит смысл');
+        : 'Умный ритм · реагирую на сцену и примерно раз в 8–10 секунд проверяю сам');
       scheduleAdaptiveTick(40);
     }
     emitState();
@@ -743,6 +789,7 @@
   liveAiPanelClose?.addEventListener('click', closePanel);
   liveAiToggle?.addEventListener('click', () => setEnabled(!state.enabled));
 
+  ensureModeControls();
   for (const button of modeButtons) {
     button.addEventListener('click', () => setMode(button.dataset.liveAiMode || ''));
   }
@@ -751,7 +798,7 @@
   switchCameraButton?.addEventListener('click', () => {
     previousSample = null;
     state.pendingSceneChange = false;
-    state.activeNextAt = state.rhythm === 'active' ? Date.now() + ACTIVE_FIRST_DELAY_MS : 0;
+    resetCadenceTimers(true);
   }, { capture: true });
   backButton?.addEventListener('click', resetForCameraExit, { capture: true });
   window.addEventListener('pagehide', resetForCameraExit);
@@ -764,7 +811,7 @@
     } else if (!resultDialog?.open && !cameraView?.classList.contains('hidden')) {
       previousSample = null;
       state.pendingSceneChange = false;
-      state.activeNextAt = state.rhythm === 'active' ? Date.now() + ACTIVE_FIRST_DELAY_MS : 0;
+      resetCadenceTimers(true);
       scheduleAdaptiveTick(80);
     }
   });
