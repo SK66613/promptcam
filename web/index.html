@@ -13,6 +13,7 @@
   <link rel="stylesheet" href="/style.css" />
   <link rel="stylesheet" href="/telegram.css" />
   <link rel="stylesheet" href="/theme-cinematic.css" />
+  <link rel="stylesheet" href="/live-ai.css" />
   <link rel="stylesheet" href="/billing.css" />
 </head>
 <body>
@@ -30,6 +31,7 @@
     <symbol id="i-layers" viewBox="0 0 24 24"><path d="m12 3 8 4-8 4-8-4 8-4Z"/><path d="m4 12 8 4 8-4M4 17l8 4 8-4"/></symbol>
     <symbol id="i-position" viewBox="0 0 24 24"><path d="M4 5h16M7 10h10M5 15h14M9 20h6"/></symbol>
     <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 6h8M16 6h4M4 12h3M11 12h9M4 18h10M18 18h2"/><circle cx="14" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="16" cy="18" r="2"/></symbol>
+    <symbol id="i-sparkles" viewBox="0 0 24 24"><path d="M12 3l1.1 3.1L16 7.2l-2.9 1.1L12 11.5l-1.1-3.2L8 7.2l2.9-1.1L12 3Z"/><path d="M18.2 12.5l.7 2 1.9.7-1.9.8-.7 2-.8-2-1.9-.8 1.9-.7.8-2Z"/><path d="M6.2 12.8l1 2.8 2.6 1-2.6 1-1 2.8-1-2.8-2.6-1 2.6-1 1-2.8Z"/></symbol>
   </svg>
 
   <main id="editorView" class="screen editor-screen">
@@ -119,9 +121,35 @@
     </section>
 
     <div class="camera-tool-rail" aria-label="Инструменты камеры">
+      <button id="liveAiButton" class="camera-tool-button live-ai-tool" type="button" aria-label="Открыть AI Live" aria-expanded="false" data-active="false"><svg><use href="#i-sparkles"/></svg><span>AI Live</span></button>
       <button id="switchCameraButton" class="camera-tool-button" type="button" aria-label="Сменить камеру"><svg><use href="#i-camera-switch"/></svg><span>Камера</span></button>
       <button id="cameraSettingsToggle" class="camera-tool-button" type="button" aria-expanded="false"><svg><use href="#i-sliders"/></svg><span>Настройки</span></button>
     </div>
+
+    <section id="liveAiPanel" class="live-ai-panel" hidden aria-labelledby="liveAiTitle">
+      <div class="live-ai-panel-head">
+        <div class="live-ai-panel-title">
+          <span class="live-ai-kicker">PROMPTCAM AI</span>
+          <strong id="liveAiTitle">AI Live</strong>
+          <span class="live-ai-badge">FOUNDATION</span>
+        </div>
+        <button id="liveAiPanelClose" class="live-ai-panel-close" type="button" aria-label="Закрыть AI Live">×</button>
+      </div>
+      <p class="live-ai-copy">Сейчас проверяем только локальный захват кадра. Ничего не отправляется в сеть и ничего не сохраняется.</p>
+      <button id="liveAiToggle" class="live-ai-toggle" type="button" aria-pressed="false">
+        <span>AI Live<small>Локальная подготовка камеры</small></span>
+        <strong id="liveAiToggleValue">OFF</strong>
+      </button>
+      <span class="live-ai-mode-label">БУДУЩИЙ РЕЖИМ</span>
+      <div class="live-ai-modes" aria-label="Режим AI Live">
+        <button class="live-ai-mode" type="button" data-live-ai-mode="jokes" aria-pressed="true">😄 Шутки</button>
+        <button class="live-ai-mode" type="button" data-live-ai-mode="director" aria-pressed="false">🎬 Режиссёр</button>
+        <button class="live-ai-mode" type="button" data-live-ai-mode="ideas" aria-pressed="false">💡 Идеи</button>
+        <button class="live-ai-mode" type="button" data-live-ai-mode="hooks" aria-pressed="false">🎣 Хуки</button>
+      </div>
+      <p id="liveAiStatus" class="live-ai-status" role="status" aria-live="polite">Готов к локальной проверке кадра.</p>
+    </section>
+
     <div id="cameraSettings" class="camera-settings" hidden>
       <label>Скорость <input id="cameraSpeedInput" type="range" min="15" max="110" value="42" /></label>
       <label>Текст <input id="cameraFontInput" type="range" min="22" max="56" value="32" /></label>
@@ -177,6 +205,7 @@
   <script src="/telegram.js" defer></script>
   <script src="/watermark.js" defer></script>
   <script src="/billing.js" defer></script>
+  <script src="/live-ai.js" defer></script>
   <script src="/app.js" defer></script>
 </body>
 </html>

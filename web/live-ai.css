@@ -1,0 +1,165 @@
+.live-ai-panel[hidden] { display: none !important; }
+
+.camera-tool-button.live-ai-tool.is-active {
+  border-color: rgba(145, 105, 255, .58);
+  background: linear-gradient(155deg, rgba(105, 67, 255, .76), rgba(39, 66, 164, .66));
+  box-shadow: 0 0 26px rgba(104, 72, 255, .28), inset 0 1px 0 rgba(255,255,255,.14);
+}
+.camera-tool-button.live-ai-tool.is-active span { color: #fff; }
+.camera-tool-button.live-ai-tool.is-active svg { filter: drop-shadow(0 0 8px rgba(216,202,255,.7)); }
+
+.live-ai-panel {
+  position: absolute;
+  z-index: 18;
+  right: max(82px, calc(var(--app-safe-right) + 72px));
+  bottom: calc(126px + var(--app-safe-bottom));
+  width: min(304px, calc(100vw - 102px - var(--app-safe-left) - var(--app-safe-right)));
+  padding: 14px;
+  border: 1px solid rgba(157, 126, 255, .28);
+  border-radius: 19px;
+  background: linear-gradient(155deg, rgba(19, 17, 31, .94), rgba(9, 11, 23, .91));
+  box-shadow: 0 22px 62px rgba(0,0,0,.52), 0 0 34px rgba(93, 62, 255, .12);
+  color: #fff;
+  backdrop-filter: blur(20px) saturate(130%);
+  -webkit-backdrop-filter: blur(20px) saturate(130%);
+}
+.live-ai-panel-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+.live-ai-panel-title { display: grid; gap: 3px; }
+.live-ai-kicker {
+  color: #a98cff;
+  font-size: 9px;
+  font-weight: 850;
+  letter-spacing: .13em;
+}
+.live-ai-panel-title strong { font-size: 16px; letter-spacing: -.01em; }
+.live-ai-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 0 8px;
+  border: 1px solid rgba(153, 119, 255, .25);
+  border-radius: 999px;
+  background: rgba(123, 84, 255, .12);
+  color: #c8b7ff;
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: .08em;
+}
+.live-ai-panel-close {
+  width: 30px;
+  height: 30px;
+  margin: -4px -4px 0 0;
+  border: 0;
+  border-radius: 10px;
+  background: rgba(255,255,255,.055);
+  color: #bcb7ca;
+  font-size: 20px;
+  line-height: 1;
+}
+.live-ai-copy {
+  margin: 10px 0 12px;
+  color: #aaa5ba;
+  font-size: 10px;
+  line-height: 1.45;
+}
+.live-ai-toggle {
+  width: 100%;
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 12px;
+  border: 1px solid rgba(255,255,255,.1);
+  border-radius: 14px;
+  background: rgba(255,255,255,.045);
+  color: #fff;
+  text-align: left;
+}
+.live-ai-toggle span { display: grid; gap: 2px; font-size: 12px; font-weight: 750; }
+.live-ai-toggle span small { color: #8f8a9d; font-size: 9px; font-weight: 560; }
+.live-ai-toggle strong {
+  display: grid;
+  min-width: 42px;
+  height: 25px;
+  place-items: center;
+  border-radius: 999px;
+  background: rgba(255,255,255,.08);
+  color: #9791a5;
+  font-size: 9px;
+  letter-spacing: .08em;
+}
+.live-ai-toggle[aria-pressed="true"] {
+  border-color: rgba(139,101,255,.42);
+  background: rgba(103,70,255,.11);
+}
+.live-ai-toggle[aria-pressed="true"] strong {
+  background: linear-gradient(145deg, #7f59ff, #4a72ff);
+  color: #fff;
+  box-shadow: 0 0 16px rgba(108,77,255,.28);
+}
+.live-ai-mode-label {
+  display: block;
+  margin: 12px 2px 7px;
+  color: #7f7a8e;
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: .11em;
+}
+.live-ai-modes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px;
+}
+.live-ai-mode {
+  min-height: 36px;
+  padding: 0 8px;
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: 11px;
+  background: rgba(255,255,255,.035);
+  color: #aaa5b7;
+  font-size: 10px;
+  font-weight: 680;
+}
+.live-ai-mode.is-selected {
+  border-color: rgba(142,105,255,.38);
+  background: rgba(113,78,255,.13);
+  color: #eee8ff;
+}
+.live-ai-status {
+  min-height: 30px;
+  margin: 10px 1px 0;
+  color: #8f899f;
+  font-size: 9px;
+  line-height: 1.4;
+}
+.live-ai-status[data-tone="success"] { color: #84dea6; }
+.live-ai-status[data-tone="error"] { color: #ff9da8; }
+
+.camera-screen.is-recording .live-ai-panel {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+@media (max-height: 690px) {
+  .live-ai-panel {
+    bottom: calc(108px + var(--app-safe-bottom));
+    padding: 12px;
+  }
+  .live-ai-copy { margin: 7px 0 9px; }
+  .live-ai-mode-label { margin-top: 9px; }
+  .live-ai-status { margin-top: 7px; }
+}
+
+@media (max-width: 360px) {
+  .live-ai-panel {
+    right: max(76px, calc(var(--app-safe-right) + 68px));
+    width: min(268px, calc(100vw - 90px - var(--app-safe-left) - var(--app-safe-right)));
+  }
+  .live-ai-modes { grid-template-columns: 1fr; }
+}
