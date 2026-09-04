@@ -8,7 +8,7 @@ const PLANS = Object.freeze({
     id: 'day',
     title: '1 день',
     description: 'PromptCam Pro на 24 часа',
-    stars: 25,
+    stars: 1,
     durationSeconds: 24 * 60 * 60,
     recurring: false,
     badge: ''
@@ -177,7 +177,6 @@ async function authenticateMiniApp(request, env) {
   if (!result.ok) return { ok: false, response: json({ ok: false, error: result.reason }, 401) };
   return { ok: true, body, session: result };
 }
-
 async function telegramSession(request, env) {
   const auth = await authenticateMiniApp(request, env);
   if (!auth.ok) return auth.response;
