@@ -15,8 +15,8 @@ const AI_RESPONSE_SCHEMA = {
   properties: {
     action: { type: 'string', enum: ['suggest', 'none'] },
     type: { type: 'string', enum: ['joke', 'director', 'idea', 'hook', 'none'] },
-    text: { type: 'string', maxLength: 180 },
-    scene: { type: 'string', maxLength: 220 }
+    text: { type: 'string', maxLength: 120 },
+    scene: { type: 'string', maxLength: 140 }
   },
   required: ['action', 'type', 'text', 'scene']
 };
@@ -174,27 +174,21 @@ async function consumeAiRateLimit(env, telegramId) {
 }
 
 function modeInstruction(mode) {
-  if (mode === 'director') {
-    return 'Give one short, immediately useful directing suggestion for what the speaker should show, say, or do next.';
-  }
-  if (mode === 'ideas') {
-    return 'Give one short idea that helps the speaker continue the video naturally based on what is visibly happening.';
-  }
-  if (mode === 'hooks') {
-    return 'Give one short hook or audience question that fits the visible scene and can be spoken naturally right now.';
-  }
-  return 'Give one gentle, situational joke about the visible scene. Never mock appearance, body, identity, disability, or other sensitive traits.';
+  if (mode === 'director') return 'Give one immediate directing tip: what to show, say, or do next.';
+  if (mode === 'ideas') return 'Give one natural next idea based on what is visibly happening.';
+  if (mode === 'hooks') return 'Give one short hook or audience question that fits the visible scene.';
+  return 'Give one gentle situational joke about the visible scene. Never mock appearance or identity.';
 }
 
 function buildLiveAiPrompt(mode, languageCode) {
   const language = typeof languageCode === 'string' && languageCode ? languageCode : 'en';
   return [
-    `Mode: ${mode}. User language code: ${language}.`,
+    `Mode=${mode}. Reply language=${language}.`,
     modeInstruction(mode),
-    'Comment only on clearly visible, non-sensitive details. Do not identify people or infer private/sensitive traits.',
-    'Be useful and concise: normally 3–14 words. Avoid repetition and generic filler.',
-    'If there is nothing worth saying from this frame, return action=none, type=none, text="".',
-    'scene should be a very short neutral summary of visible non-sensitive scene context.'
+    'Use only clear, non-sensitive visible details. Never identify people or infer private traits.',
+    'Keep the spoken line very short: usually 3-10 words.',
+    'If nothing is worth saying, return action=none, type=none, text="".',
+    'scene must be a tiny neutral visible-scene summary.'
   ].join('\n');
 }
 
@@ -213,8 +207,8 @@ function normalizeAiResult(value) {
   const action = value.action === 'suggest' ? 'suggest' : value.action === 'none' ? 'none' : '';
   const allowedTypes = new Set(['joke', 'director', 'idea', 'hook', 'none']);
   const type = allowedTypes.has(value.type) ? value.type : '';
-  const text = typeof value.text === 'string' ? value.text.trim().slice(0, 180) : '';
-  const scene = typeof value.scene === 'string' ? value.scene.trim().slice(0, 220) : '';
+  const text = typeof value.text === 'string' ? value.text.trim().slice(0, 120) : '';
+  const scene = typeof value.scene === 'string' ? value.scene.trim().slice(0, 140) : '';
   if (!action || !type) return null;
   if (action === 'none') return { action: 'none', type: 'none', text: '', scene };
   if (!text || type === 'none') return null;
@@ -227,6 +221,7 @@ async function callLiveAiProvider(env, body, user) {
   const model = typeof env.OPENAI_LIVE_MODEL === 'string' && env.OPENAI_LIVE_MODEL.trim()
     ? env.OPENAI_LIVE_MODEL.trim()
     : AI_DEFAULT_MODEL;
+  const providerStartedAt = Date.now();
 
   const response = await fetch('https://api.openai.com/v1/responses', {
     method: 'POST',
@@ -237,8 +232,9 @@ async function callLiveAiProvider(env, body, user) {
     body: JSON.stringify({
       model,
       store: false,
-      max_output_tokens: 180,
-      instructions: 'You are PromptCam Live AI, a realtime camera copilot. Follow the requested mode and return only the required structured result.',
+      reasoning: { effort: 'none' },
+      max_output_tokens: 96,
+      instructions: 'You are PromptCam Live AI. React fast. Return only the required structured result.',
       input: [{
         role: 'user',
         content: [
@@ -258,19 +254,21 @@ async function callLiveAiProvider(env, body, user) {
   });
 
   const payload = await response.json().catch(() => null);
-  if (!response.ok) return { ok: false, error: 'ai_provider_failed', status: 502 };
+  const providerLatencyMs = Math.max(0, Date.now() - providerStartedAt);
+  if (!response.ok) return { ok: false, error: 'ai_provider_failed', status: 502, providerLatencyMs };
 
   const rawText = extractResponseText(payload);
   let parsed;
   try { parsed = JSON.parse(rawText); }
-  catch (_) { return { ok: false, error: 'ai_invalid_response', status: 502 }; }
+  catch (_) { return { ok: false, error: 'ai_invalid_response', status: 502, providerLatencyMs }; }
 
   const result = normalizeAiResult(parsed);
-  if (!result) return { ok: false, error: 'ai_invalid_response', status: 502 };
-  return { ok: true, result };
+  if (!result) return { ok: false, error: 'ai_invalid_response', status: 502, providerLatencyMs };
+  return { ok: true, result, providerLatencyMs };
 }
 
 async function liveAi(request, env, ctx) {
+  const startedAt = Date.now();
   if (requestTooLarge(request)) return json({ ok: false, error: 'request_too_large' }, 413);
 
   const body = await parseJsonBody(request);
@@ -294,12 +292,26 @@ async function liveAi(request, env, ctx) {
   }
 
   const provider = await callLiveAiProvider(env, body, auth.user);
-  if (!provider.ok) return json({ ok: false, error: provider.error }, provider.status);
+  if (!provider.ok) return json({
+    ok: false,
+    error: provider.error,
+    latency: {
+      totalMs: Math.max(0, Date.now() - startedAt),
+      providerMs: provider.providerLatencyMs || 0
+    }
+  }, provider.status);
 
+  const totalMs = Math.max(0, Date.now() - startedAt);
   return json({
     ok: true,
     ...provider.result,
+    latency: {
+      totalMs,
+      providerMs: provider.providerLatencyMs
+    },
     rateLimit: { remaining: rateLimit.remaining }
+  }, 200, {
+    'Server-Timing': `promptcam-ai;dur=${totalMs}`
   });
 }
 

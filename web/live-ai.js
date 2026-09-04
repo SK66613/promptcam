@@ -19,14 +19,14 @@
 
   const MODE_STORAGE_KEY = 'promptcam.live-ai.mode.v1';
   const VALID_MODES = new Set(['jokes', 'director', 'ideas', 'hooks']);
-  const CAPTURE_MAX_EDGE = 512;
-  const CAPTURE_QUALITY = 0.72;
+  const CAPTURE_MAX_EDGE = 384;
+  const CAPTURE_QUALITY = 0.62;
   const SAMPLE_WIDTH = 32;
   const SAMPLE_HEIGHT = 24;
-  const SAMPLE_INTERVAL_MS = 300;
-  const NETWORK_MIN_INTERVAL_MS = 2000;
-  const SUGGESTION_MIN_INTERVAL_MS = 3200;
-  const SUGGESTION_VISIBLE_MS = 6500;
+  const SAMPLE_INTERVAL_MS = 220;
+  const NETWORK_MIN_INTERVAL_MS = 1200;
+  const SUGGESTION_MIN_INTERVAL_MS = 2200;
+  const SUGGESTION_VISIBLE_MS = 5500;
   const PIXEL_CHANGE_THRESHOLD = 24;
   const MEAN_CHANGE_THRESHOLD = 10;
   const CHANGED_RATIO_THRESHOLD = 0.16;
@@ -41,7 +41,9 @@
     lastRequestAt: 0,
     lastSuggestionAt: 0,
     lastSceneScore: 0,
+    lastLatencyMs: 0,
     frameSequence: 0,
+    sceneVersion: 0,
     pendingSceneChange: false,
     backoffUntil: 0
   };
@@ -87,8 +89,8 @@
     const toggleHint = liveAiToggle?.querySelector('small');
     const modeLabel = liveAiPanel?.querySelector('.live-ai-mode-label');
     if (badge) badge.textContent = 'BETA';
-    if (copy) copy.textContent = 'PromptCam быстро сравнивает кадры локально и обращается к AI только когда сцена заметно меняется.';
-    if (toggleHint) toggleHint.textContent = 'Адаптивные подсказки по сцене';
+    if (copy) copy.textContent = 'PromptCam сравнивает кадры локально и отправляет компактный кадр в AI только при заметном изменении сцены.';
+    if (toggleHint) toggleHint.textContent = 'Быстрые адаптивные подсказки';
     if (modeLabel) modeLabel.textContent = 'РЕЖИМ';
   }
 
@@ -130,6 +132,13 @@
     else delete liveAiStatus.dataset.tone;
   }
 
+  function formatLatency(milliseconds) {
+    const value = Number(milliseconds || 0);
+    if (!value) return '';
+    if (value < 1000) return `${Math.round(value)} мс`;
+    return `${(value / 1000).toFixed(value < 2000 ? 1 : 0)} с`;
+  }
+
   function render() {
     liveAiButton?.classList.toggle('is-active', state.enabled);
     liveAiButton?.setAttribute('data-active', String(state.enabled));
@@ -159,7 +168,9 @@
       lastRequestAt: state.lastRequestAt,
       lastSuggestionAt: state.lastSuggestionAt,
       lastSceneScore: state.lastSceneScore,
+      lastLatencyMs: state.lastLatencyMs,
       frameSequence: state.frameSequence,
+      sceneVersion: state.sceneVersion,
       pendingSceneChange: state.pendingSceneChange,
       backoffUntil: state.backoffUntil
     };
@@ -368,7 +379,7 @@
       disableWithStatus('Telegram-сессия устарела. Закрой и снова открой PromptCam.');
       return;
     }
-    state.backoffUntil = now + 5000;
+    state.backoffUntil = now + 2500;
     setStatus('AI временно не ответил. Продолжаю наблюдать локально…', 'error');
   }
 
@@ -384,6 +395,8 @@
     if (!force && now - state.lastRequestAt < NETWORK_MIN_INTERVAL_MS) return false;
     if (!force && state.lastSuggestionAt && now - state.lastSuggestionAt < SUGGESTION_MIN_INTERVAL_MS) return false;
 
+    const requestSceneVersion = state.sceneVersion;
+    const requestStartedAt = Date.now();
     state.busy = true;
     state.pendingSceneChange = false;
     state.lastRequestAt = now;
@@ -399,12 +412,19 @@
       const result = await postLiveAi(frameDataUrl, activeController.signal);
       if (!state.enabled) return false;
 
+      state.lastLatencyMs = Number(result?.latency?.totalMs || (Date.now() - requestStartedAt));
+
+      if (state.sceneVersion !== requestSceneVersion && state.pendingSceneChange) {
+        setStatus(`Сцена уже изменилась · обновляю контекст · ${formatLatency(state.lastLatencyMs)}`);
+        return false;
+      }
+
       if (result.action === 'suggest' && typeof result.text === 'string' && result.text.trim()) {
         state.lastSuggestionAt = Date.now();
         showSuggestion(result);
-        setStatus('AI Live активен · реагируем только на изменения сцены', 'success');
+        setStatus(`AI Live · ответ ${formatLatency(state.lastLatencyMs)}`, 'success');
       } else {
-        setStatus('AI Live наблюдает · сейчас лучше ничего не добавлять');
+        setStatus(`AI Live наблюдает · ${formatLatency(state.lastLatencyMs)}`);
       }
       return true;
     } catch (error) {
@@ -415,7 +435,7 @@
       activeController = null;
       render();
       emitState();
-      if (state.enabled && state.pendingSceneChange) scheduleAdaptiveTick(60);
+      if (state.enabled && state.pendingSceneChange) scheduleAdaptiveTick(40);
     }
   }
 
@@ -437,13 +457,15 @@
     if (currentSample) {
       if (!previousSample) {
         previousSample = currentSample;
-        state.pendingSceneChange = true;
-        state.lastSceneScore = 255;
+        state.lastSceneScore = 0;
       } else {
         const difference = sceneDifference(previousSample, currentSample);
         previousSample = currentSample;
         state.lastSceneScore = Number(difference.mean.toFixed(2));
-        if (difference.changed) state.pendingSceneChange = true;
+        if (difference.changed) {
+          state.sceneVersion += 1;
+          state.pendingSceneChange = true;
+        }
       }
     }
 
@@ -453,9 +475,9 @@
 
   function startAdaptiveLoop() {
     stopAdaptiveLoop({ abort: false });
-    state.pendingSceneChange = true;
+    state.pendingSceneChange = false;
     state.backoffUntil = 0;
-    scheduleAdaptiveTick(80);
+    scheduleAdaptiveTick(60);
   }
 
   async function setEnabled(enabled) {
@@ -477,8 +499,9 @@
 
     state.enabled = true;
     previousSample = null;
+    state.pendingSceneChange = false;
     render();
-    setStatus('AI Live запускается · ищем изменения сцены…');
+    setStatus('AI Live готов · измени сцену, чтобы получить реакцию');
     emitState();
     startAdaptiveLoop();
   }
@@ -488,17 +511,18 @@
     state.mode = mode;
     storeMode(mode);
     previousSample = null;
-    state.pendingSceneChange = state.enabled;
+    state.pendingSceneChange = false;
     hideSuggestion();
     render();
-    if (state.enabled) setStatus('Режим изменён · обновляю контекст сцены…');
+    if (state.enabled) setStatus('Режим изменён · жду следующего изменения сцены');
     emitState();
-    if (state.enabled) scheduleAdaptiveTick(60);
+    if (state.enabled) scheduleAdaptiveTick(40);
     return true;
   }
 
   function requestNow() {
     if (!state.enabled) return false;
+    state.sceneVersion += 1;
     state.pendingSceneChange = true;
     requestSuggestion({ force: true });
     return true;
@@ -530,7 +554,7 @@
   cameraSettingsToggle?.addEventListener('click', closePanel, { capture: true });
   switchCameraButton?.addEventListener('click', () => {
     previousSample = null;
-    if (state.enabled) state.pendingSceneChange = true;
+    state.pendingSceneChange = false;
   }, { capture: true });
   backButton?.addEventListener('click', resetForCameraExit, { capture: true });
   window.addEventListener('pagehide', resetForCameraExit);
@@ -542,15 +566,15 @@
       state.running = false;
     } else {
       previousSample = null;
-      state.pendingSceneChange = true;
-      scheduleAdaptiveTick(120);
+      state.pendingSceneChange = false;
+      scheduleAdaptiveTick(80);
     }
   });
 
   if (cameraView) {
     const observer = new MutationObserver(() => {
       if (cameraView.classList.contains('is-recording')) closePanel();
-      if (!cameraView.classList.contains('hidden') && state.enabled) scheduleAdaptiveTick(100);
+      if (!cameraView.classList.contains('hidden') && state.enabled) scheduleAdaptiveTick(70);
     });
     observer.observe(cameraView, { attributes: true, attributeFilter: ['class'] });
   }
