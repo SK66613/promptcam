@@ -29,7 +29,10 @@
   const NETWORK_MIN_INTERVAL_MS = 1200;
   const SUGGESTION_MIN_INTERVAL_MS = 2200;
   const SUGGESTION_VISIBLE_MS = 5500;
-  const ACTIVE_HEARTBEAT_MS = 4500;
+  const ACTIVE_CADENCE_MS = 3000;
+  const ACTIVE_FIRST_DELAY_MS = 700;
+  const ACTIVE_MIN_SUGGESTION_MS = 1600;
+  const ACTIVE_RETRY_AFTER_NONE_MS = 1800;
   const PIXEL_CHANGE_THRESHOLD = 24;
   const MEAN_CHANGE_THRESHOLD = 10;
   const CHANGED_RATIO_THRESHOLD = 0.16;
@@ -47,7 +50,7 @@
     lastSceneScore: 0,
     lastLatencyMs: 0,
     lastRequestTrigger: '',
-    heartbeatAnchorAt: 0,
+    activeNextAt: 0,
     frameSequence: 0,
     sceneVersion: 0,
     pendingSceneChange: false,
@@ -119,7 +122,7 @@
 
     const definitions = [
       ['smart', 'Умный', 'Говорит, когда есть смысл'],
-      ['active', 'Активный', 'Реагирует и подкидывает реплики']
+      ['active', 'Активный', 'Говорит примерно каждые 3–4 сек']
     ];
 
     for (const [rhythm, title, hint] of definitions) {
@@ -222,6 +225,7 @@
       lastSceneScore: state.lastSceneScore,
       lastLatencyMs: state.lastLatencyMs,
       lastRequestTrigger: state.lastRequestTrigger,
+      activeNextAt: state.activeNextAt,
       frameSequence: state.frameSequence,
       sceneVersion: state.sceneVersion,
       pendingSceneChange: state.pendingSceneChange,
@@ -392,6 +396,7 @@
     sampleTimer = 0;
     state.running = false;
     state.pendingSceneChange = false;
+    state.activeNextAt = 0;
     previousSample = null;
     if (abort && activeController) activeController.abort();
     activeController = null;
@@ -419,6 +424,7 @@
     if (error?.status === 429) {
       const retrySeconds = Math.max(2, Number(error.retryAfter || 5));
       state.backoffUntil = now + retrySeconds * 1000;
+      if (state.rhythm === 'active') state.activeNextAt = state.backoffUntil;
       setStatus(`AI сделал короткую паузу · ${retrySeconds} с`, 'error');
       return;
     }
@@ -435,6 +441,7 @@
       return;
     }
     state.backoffUntil = now + 2500;
+    if (state.rhythm === 'active') state.activeNextAt = state.backoffUntil;
     setStatus('AI временно не ответил. Продолжаю наблюдать локально…', 'error');
   }
 
@@ -448,14 +455,18 @@
     const now = Date.now();
     if (now < state.backoffUntil) return false;
     if (!force && now - state.lastRequestAt < NETWORK_MIN_INTERVAL_MS) return false;
-    if (!force && state.lastSuggestionAt && now - state.lastSuggestionAt < SUGGESTION_MIN_INTERVAL_MS) return false;
+    const minSuggestionInterval = state.rhythm === 'active'
+      ? ACTIVE_MIN_SUGGESTION_MS
+      : SUGGESTION_MIN_INTERVAL_MS;
+    if (!force && state.lastSuggestionAt && now - state.lastSuggestionAt < minSuggestionInterval) return false;
 
     const requestSceneVersion = state.sceneVersion;
     const requestStartedAt = Date.now();
     state.busy = true;
-    if (trigger === 'scene') state.pendingSceneChange = false;
+    if (trigger === 'scene' || state.rhythm === 'active') state.pendingSceneChange = false;
     state.lastRequestAt = now;
     state.lastRequestTrigger = trigger;
+    if (state.rhythm === 'active') state.activeNextAt = now + ACTIVE_CADENCE_MS;
     activeController = new AbortController();
     render();
     emitState();
@@ -470,7 +481,11 @@
 
       state.lastLatencyMs = Number(result?.latency?.totalMs || (Date.now() - requestStartedAt));
 
-      if (state.sceneVersion !== requestSceneVersion && state.pendingSceneChange) {
+      if (
+        state.rhythm === 'smart' &&
+        state.sceneVersion !== requestSceneVersion &&
+        state.pendingSceneChange
+      ) {
         setStatus(`Сцена уже изменилась · обновляю контекст · ${formatLatency(state.lastLatencyMs)}`);
         return false;
       }
@@ -478,11 +493,14 @@
       if (result.action === 'suggest' && typeof result.text === 'string' && result.text.trim()) {
         state.lastSuggestionAt = Date.now();
         showSuggestion(result);
-        setStatus(`AI Live · ответ ${formatLatency(state.lastLatencyMs)}`, 'success');
+        setStatus(state.rhythm === 'active'
+          ? `Активный · ответ ${formatLatency(state.lastLatencyMs)}`
+          : `AI Live · ответ ${formatLatency(state.lastLatencyMs)}`, 'success');
       } else if (state.rhythm === 'smart') {
         setStatus(`AI посмотрел · решил промолчать · ${formatLatency(state.lastLatencyMs)}`);
       } else {
-        setStatus(`AI пропустил этот кадр · ${formatLatency(state.lastLatencyMs)}`);
+        state.activeNextAt = Date.now() + ACTIVE_RETRY_AFTER_NONE_MS;
+        setStatus(`AI пропустил кадр · следующая реплика скоро · ${formatLatency(state.lastLatencyMs)}`);
       }
       return true;
     } catch (error) {
@@ -493,14 +511,12 @@
       activeController = null;
       render();
       emitState();
-      if (state.enabled && state.pendingSceneChange) scheduleAdaptiveTick(40);
+      if (state.enabled && state.rhythm === 'smart' && state.pendingSceneChange) scheduleAdaptiveTick(40);
     }
   }
 
   function activeHeartbeatDue(now = Date.now()) {
-    if (state.rhythm !== 'active' || state.pendingSceneChange || state.busy) return false;
-    const anchor = Math.max(state.lastRequestAt || 0, state.heartbeatAnchorAt || 0);
-    return anchor > 0 && now - anchor >= ACTIVE_HEARTBEAT_MS;
+    return state.rhythm === 'active' && !state.busy && state.activeNextAt > 0 && now >= state.activeNextAt;
   }
 
   function adaptiveTick() {
@@ -533,10 +549,10 @@
       }
     }
 
-    if (state.pendingSceneChange && !state.busy) {
+    if (state.rhythm === 'active') {
+      if (previousSample && activeHeartbeatDue()) requestSuggestion({ trigger: 'heartbeat' });
+    } else if (state.pendingSceneChange && !state.busy) {
       requestSuggestion({ trigger: 'scene' });
-    } else if (previousSample && activeHeartbeatDue()) {
-      requestSuggestion({ trigger: 'heartbeat' });
     }
     scheduleAdaptiveTick();
   }
@@ -545,7 +561,9 @@
     stopAdaptiveLoop({ abort: false });
     state.pendingSceneChange = false;
     state.backoffUntil = 0;
-    state.heartbeatAnchorAt = Date.now();
+    state.activeNextAt = state.rhythm === 'active'
+      ? Date.now() + ACTIVE_FIRST_DELAY_MS
+      : 0;
     scheduleAdaptiveTick(60);
   }
 
@@ -571,7 +589,7 @@
     state.pendingSceneChange = false;
     render();
     setStatus(state.rhythm === 'active'
-      ? 'AI Live готов · активный ритм, реплики будут появляться регулярно'
+      ? 'AI Live готов · первая активная реплика через секунду'
       : 'AI Live готов · в умном ритме AI может решить промолчать');
     emitState();
     startAdaptiveLoop();
@@ -583,10 +601,12 @@
     storeValue(MODE_STORAGE_KEY, mode);
     previousSample = null;
     state.pendingSceneChange = false;
-    state.heartbeatAnchorAt = Date.now();
+    state.activeNextAt = state.rhythm === 'active' ? Date.now() + ACTIVE_FIRST_DELAY_MS : 0;
     hideSuggestion();
     render();
-    if (state.enabled) setStatus('Режим изменён · жду следующего момента');
+    if (state.enabled) setStatus(state.rhythm === 'active'
+      ? 'Режим изменён · готовлю новую реплику'
+      : 'Режим изменён · жду следующего момента');
     emitState();
     if (state.enabled) scheduleAdaptiveTick(40);
     return true;
@@ -596,12 +616,13 @@
     if (!VALID_RHYTHMS.has(rhythm)) return false;
     state.rhythm = rhythm;
     storeValue(RHYTHM_STORAGE_KEY, rhythm);
-    state.heartbeatAnchorAt = Date.now();
+    state.pendingSceneChange = false;
+    state.activeNextAt = rhythm === 'active' ? Date.now() + ACTIVE_FIRST_DELAY_MS : 0;
     hideSuggestion();
     render();
     if (state.enabled) {
       setStatus(rhythm === 'active'
-        ? 'Активный ритм · AI будет реагировать и иногда подкидывать реплики сам'
+        ? 'Активный ритм · говорю примерно каждые 3–4 секунды'
         : 'Умный ритм · AI говорит только когда видит смысл');
       scheduleAdaptiveTick(40);
     }
@@ -640,7 +661,7 @@
   switchCameraButton?.addEventListener('click', () => {
     previousSample = null;
     state.pendingSceneChange = false;
-    state.heartbeatAnchorAt = Date.now();
+    state.activeNextAt = state.rhythm === 'active' ? Date.now() + ACTIVE_FIRST_DELAY_MS : 0;
   }, { capture: true });
   backButton?.addEventListener('click', resetForCameraExit, { capture: true });
   window.addEventListener('pagehide', resetForCameraExit);
@@ -653,7 +674,7 @@
     } else {
       previousSample = null;
       state.pendingSceneChange = false;
-      state.heartbeatAnchorAt = Date.now();
+      state.activeNextAt = state.rhythm === 'active' ? Date.now() + ACTIVE_FIRST_DELAY_MS : 0;
       scheduleAdaptiveTick(80);
     }
   });
