@@ -1,8 +1,9 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "promptcam",
-  "main": "./worker/index.js",
+  "main": "./worker/entry.js",
   "compatibility_date": "2026-09-03",
+  "keep_vars": true,
   "assets": {
     "directory": "./web",
     "binding": "ASSETS",
