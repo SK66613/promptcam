@@ -3,6 +3,8 @@ import app from './index.js';
 const TELEGRAM_ALLOWED_UPDATES = ['message', 'pre_checkout_query'];
 const WEBHOOK_SECRET_PATTERN = /^[A-Za-z0-9_-]{1,256}$/;
 const AI_ALLOWED_MODES = new Set(['jokes', 'director', 'ideas', 'hooks']);
+const AI_ALLOWED_RHYTHMS = new Set(['smart', 'active']);
+const AI_ALLOWED_TRIGGERS = new Set(['scene', 'heartbeat', 'manual']);
 const AI_FRAME_PATTERN = /^data:image\/(?:jpeg|webp);base64,[A-Za-z0-9+/=]+$/;
 const AI_MAX_REQUEST_BYTES = 800_000;
 const AI_MAX_FRAME_CHARS = 650_000;
@@ -55,12 +57,8 @@ function desiredWebhookUrl(request) {
 }
 
 async function ensureTelegramWebhook(request, env) {
-  if (!env.TELEGRAM_BOT_TOKEN) {
-    return { ok: false, error: 'telegram_not_configured' };
-  }
-  if (!env.TELEGRAM_WEBHOOK_SECRET) {
-    return { ok: false, error: 'telegram_webhook_not_configured' };
-  }
+  if (!env.TELEGRAM_BOT_TOKEN) return { ok: false, error: 'telegram_not_configured' };
+  if (!env.TELEGRAM_WEBHOOK_SECRET) return { ok: false, error: 'telegram_webhook_not_configured' };
   if (!WEBHOOK_SECRET_PATTERN.test(env.TELEGRAM_WEBHOOK_SECRET)) {
     return { ok: false, error: 'telegram_webhook_secret_invalid' };
   }
@@ -74,11 +72,7 @@ async function ensureTelegramWebhook(request, env) {
     });
     return { ok: true, url };
   } catch (error) {
-    return {
-      ok: false,
-      error: 'telegram_webhook_setup_failed',
-      reason: error?.description || ''
-    };
+    return { ok: false, error: 'telegram_webhook_setup_failed', reason: error?.description || '' };
   }
 }
 
@@ -90,20 +84,20 @@ function requestTooLarge(request) {
 }
 
 async function parseJsonBody(request) {
-  try {
-    return await request.json();
-  } catch (_) {
-    return null;
-  }
+  try { return await request.json(); }
+  catch (_) { return null; }
 }
 
-function validateLiveAiBody(body) {
-  if (!body || typeof body !== 'object') return 'invalid_json';
-  if (typeof body.initData !== 'string' || !body.initData) return 'invalid_init_data';
-  if (!AI_ALLOWED_MODES.has(body.mode)) return 'invalid_ai_mode';
-  if (typeof body.frame !== 'string' || body.frame.length > AI_MAX_FRAME_CHARS) return 'invalid_ai_frame';
-  if (!AI_FRAME_PATTERN.test(body.frame)) return 'invalid_ai_frame';
-  return '';
+function normalizeLiveAiBody(body) {
+  if (!body || typeof body !== 'object') return { ok: false, error: 'invalid_json' };
+  if (typeof body.initData !== 'string' || !body.initData) return { ok: false, error: 'invalid_init_data' };
+  if (!AI_ALLOWED_MODES.has(body.mode)) return { ok: false, error: 'invalid_ai_mode' };
+  if (typeof body.frame !== 'string' || body.frame.length > AI_MAX_FRAME_CHARS || !AI_FRAME_PATTERN.test(body.frame)) {
+    return { ok: false, error: 'invalid_ai_frame' };
+  }
+  const rhythm = AI_ALLOWED_RHYTHMS.has(body.rhythm) ? body.rhythm : 'smart';
+  const trigger = AI_ALLOWED_TRIGGERS.has(body.trigger) ? body.trigger : 'scene';
+  return { ok: true, body: { ...body, rhythm, trigger } };
 }
 
 async function authenticateLiveAi(request, env, ctx, initData) {
@@ -124,9 +118,7 @@ async function authenticateLiveAi(request, env, ctx, initData) {
 }
 
 async function consumeAiRateLimit(env, telegramId) {
-  if (!env.DB || typeof env.DB.prepare !== 'function') {
-    return { ok: false, configured: false };
-  }
+  if (!env.DB || typeof env.DB.prepare !== 'function') return { ok: false, configured: false };
 
   const now = Math.floor(Date.now() / 1000);
   const minuteBucket = Math.floor(now / 60);
@@ -156,18 +148,12 @@ async function consumeAiRateLimit(env, telegramId) {
     }
 
     const row = await env.DB.prepare(`
-      SELECT requests
-      FROM ai_usage_minute
+      SELECT requests FROM ai_usage_minute
       WHERE telegram_id = ? AND minute_bucket = ?
       LIMIT 1
     `).bind(telegramId, minuteBucket).first();
     const current = Number(row?.requests || AI_RATE_LIMIT_PER_MINUTE);
-
-    return {
-      ok: true,
-      configured: true,
-      remaining: Math.max(0, AI_RATE_LIMIT_PER_MINUTE - current)
-    };
+    return { ok: true, configured: true, remaining: Math.max(0, AI_RATE_LIMIT_PER_MINUTE - current) };
   } catch (_) {
     return { ok: false, configured: false };
   }
@@ -180,14 +166,24 @@ function modeInstruction(mode) {
   return 'Give one gentle situational joke about the visible scene. Never mock appearance or identity.';
 }
 
-function buildLiveAiPrompt(mode, languageCode) {
+function rhythmInstruction(rhythm, trigger) {
+  if (rhythm === 'active') {
+    const heartbeat = trigger === 'heartbeat'
+      ? 'The scene may be calm. Still give a fresh short line grounded in what is visible.'
+      : 'React to this visible moment with a short spoken line.';
+    return `Active rhythm. ${heartbeat} Prefer action=suggest; use action=none only if no safe grounded line is possible.`;
+  }
+  return 'Smart rhythm. It is fine to return action=none when there is nothing genuinely useful or funny to say.';
+}
+
+function buildLiveAiPrompt(mode, languageCode, rhythm, trigger) {
   const language = typeof languageCode === 'string' && languageCode ? languageCode : 'en';
   return [
-    `Mode=${mode}. Reply language=${language}.`,
+    `Mode=${mode}. Rhythm=${rhythm}. Trigger=${trigger}. Reply language=${language}.`,
     modeInstruction(mode),
+    rhythmInstruction(rhythm, trigger),
     'Use only clear, non-sensitive visible details. Never identify people or infer private traits.',
     'Keep the spoken line very short: usually 3-10 words.',
-    'If nothing is worth saying, return action=none, type=none, text="".',
     'scene must be a tiny neutral visible-scene summary.'
   ].join('\n');
 }
@@ -238,7 +234,7 @@ async function callLiveAiProvider(env, body, user) {
       input: [{
         role: 'user',
         content: [
-          { type: 'input_text', text: buildLiveAiPrompt(body.mode, user.language_code) },
+          { type: 'input_text', text: buildLiveAiPrompt(body.mode, user.language_code, body.rhythm, body.trigger) },
           { type: 'input_image', image_url: body.frame, detail: 'low' }
         ]
       }],
@@ -255,34 +251,65 @@ async function callLiveAiProvider(env, body, user) {
 
   const payload = await response.json().catch(() => null);
   const providerLatencyMs = Math.max(0, Date.now() - providerStartedAt);
-  if (!response.ok) return { ok: false, error: 'ai_provider_failed', status: 502, providerLatencyMs };
+  if (!response.ok) return { ok: false, error: 'ai_provider_failed', status: 502, providerLatencyMs, model };
 
   const rawText = extractResponseText(payload);
   let parsed;
   try { parsed = JSON.parse(rawText); }
-  catch (_) { return { ok: false, error: 'ai_invalid_response', status: 502, providerLatencyMs }; }
+  catch (_) { return { ok: false, error: 'ai_invalid_response', status: 502, providerLatencyMs, model }; }
 
   const result = normalizeAiResult(parsed);
-  if (!result) return { ok: false, error: 'ai_invalid_response', status: 502, providerLatencyMs };
-  return { ok: true, result, providerLatencyMs };
+  if (!result) return { ok: false, error: 'ai_invalid_response', status: 502, providerLatencyMs, model };
+  return { ok: true, result, providerLatencyMs, model };
+}
+
+async function recordAiEvent(env, event) {
+  if (!env.DB || typeof env.DB.prepare !== 'function') return;
+  try {
+    await env.DB.prepare(`
+      INSERT INTO ai_request_events (
+        telegram_id, created_at, mode, rhythm, trigger_type, action,
+        status, total_ms, provider_ms, model
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      event.telegramId,
+      event.createdAt,
+      event.mode,
+      event.rhythm,
+      event.trigger,
+      event.action,
+      event.status,
+      event.totalMs,
+      event.providerMs,
+      event.model
+    ).run();
+  } catch (_) {
+    // Telemetry is best-effort and must never affect the live response.
+  }
+}
+
+function queueAiEvent(ctx, env, event) {
+  const promise = recordAiEvent(env, event);
+  if (ctx && typeof ctx.waitUntil === 'function') ctx.waitUntil(promise);
+  else promise.catch(() => {});
 }
 
 async function liveAi(request, env, ctx) {
   const startedAt = Date.now();
   if (requestTooLarge(request)) return json({ ok: false, error: 'request_too_large' }, 413);
 
-  const body = await parseJsonBody(request);
-  const validationError = validateLiveAiBody(body);
-  if (validationError) return json({ ok: false, error: validationError }, 400);
+  const rawBody = await parseJsonBody(request);
+  const normalized = normalizeLiveAiBody(rawBody);
+  if (!normalized.ok) return json({ ok: false, error: normalized.error }, 400);
+  const body = normalized.body;
 
   const auth = await authenticateLiveAi(request, env, ctx, body.initData);
   if (!auth.ok) return auth.response;
   if (!env.OPENAI_API_KEY) return json({ ok: false, error: 'ai_not_configured' }, 503);
 
-  const rateLimit = await consumeAiRateLimit(env, String(auth.user.id));
-  if (!rateLimit.configured) {
-    return json({ ok: false, error: 'ai_database_not_initialized' }, 503);
-  }
+  const telegramId = String(auth.user.id);
+  const rateLimit = await consumeAiRateLimit(env, telegramId);
+  if (!rateLimit.configured) return json({ ok: false, error: 'ai_database_not_initialized' }, 503);
   if (rateLimit.limited) {
     return json(
       { ok: false, error: 'ai_rate_limited', retryAfter: rateLimit.retryAfter },
@@ -292,23 +319,49 @@ async function liveAi(request, env, ctx) {
   }
 
   const provider = await callLiveAiProvider(env, body, auth.user);
-  if (!provider.ok) return json({
-    ok: false,
-    error: provider.error,
-    latency: {
-      totalMs: Math.max(0, Date.now() - startedAt),
-      providerMs: provider.providerLatencyMs || 0
-    }
-  }, provider.status);
-
   const totalMs = Math.max(0, Date.now() - startedAt);
+  const providerMs = Number(provider.providerLatencyMs || 0);
+  const model = provider.model || AI_DEFAULT_MODEL;
+
+  if (!provider.ok) {
+    queueAiEvent(ctx, env, {
+      telegramId,
+      createdAt: Math.floor(Date.now() / 1000),
+      mode: body.mode,
+      rhythm: body.rhythm,
+      trigger: body.trigger,
+      action: 'error',
+      status: provider.error,
+      totalMs,
+      providerMs,
+      model
+    });
+    return json({
+      ok: false,
+      error: provider.error,
+      latency: { totalMs, providerMs }
+    }, provider.status);
+  }
+
+  queueAiEvent(ctx, env, {
+    telegramId,
+    createdAt: Math.floor(Date.now() / 1000),
+    mode: body.mode,
+    rhythm: body.rhythm,
+    trigger: body.trigger,
+    action: provider.result.action,
+    status: 'ok',
+    totalMs,
+    providerMs,
+    model
+  });
+
   return json({
     ok: true,
     ...provider.result,
-    latency: {
-      totalMs,
-      providerMs: provider.providerLatencyMs
-    },
+    rhythm: body.rhythm,
+    trigger: body.trigger,
+    latency: { totalMs, providerMs },
     rateLimit: { remaining: rateLimit.remaining }
   }, 200, {
     'Server-Timing': `promptcam-ai;dur=${totalMs}`
@@ -345,13 +398,8 @@ export default {
 
       const webhook = await ensureTelegramWebhook(request, env);
       if (!webhook.ok) {
-        return json({
-          ok: false,
-          error: webhook.error,
-          reason: webhook.reason || ''
-        }, 503);
+        return json({ ok: false, error: webhook.error, reason: webhook.reason || '' }, 503);
       }
-
       return response;
     }
 
