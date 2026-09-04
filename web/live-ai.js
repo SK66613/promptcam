@@ -21,8 +21,11 @@
 
   const MODE_STORAGE_KEY = 'promptcam.live-ai.mode.v1';
   const RHYTHM_STORAGE_KEY = 'promptcam.live-ai.rhythm.v1';
-  const VALID_MODES = new Set(['jokes', 'director', 'ideas', 'hooks', 'critic', 'flatterer']);
-  const VALID_TYPES = new Set(['joke', 'director', 'idea', 'hook', 'critic', 'praise', 'none']);
+  const VALID_MODES = new Set(['jokes', 'director', 'ideas', 'hooks', 'crew', 'acting', 'critic', 'flatterer']);
+  const VALID_TYPES = new Set([
+    'joke', 'director', 'idea', 'hook', 'crew_director', 'crew_camera',
+    'crew_light', 'crew_actor', 'acting', 'critic', 'praise', 'none'
+  ]);
   const VALID_RHYTHMS = new Set(['smart', 'active']);
   const CAPTURE_MAX_EDGE = 384;
   const CAPTURE_QUALITY = 0.62;
@@ -154,6 +157,8 @@
     const modes = liveAiPanel?.querySelector('.live-ai-modes');
     if (!modes) return;
     const extras = [
+      ['crew', '🎬 Съёмочная группа'],
+      ['acting', '🎭 Актёрский коуч'],
       ['critic', '🧐 Критик'],
       ['flatterer', '😎 Льстец']
     ];
@@ -411,6 +416,11 @@
     if (type === 'idea') return '💡 Идея';
     if (type === 'hook') return '🎣 Хук';
     if (type === 'joke') return '😄 Шутка';
+    if (type === 'crew_director') return '🎬 Режиссёр';
+    if (type === 'crew_camera') return '📷 Оператор';
+    if (type === 'crew_light') return '💡 Свет';
+    if (type === 'crew_actor') return '🎭 Актёрский коуч';
+    if (type === 'acting') return '🎭 Актёрский коуч';
     if (type === 'critic') return '🧐 Критик';
     if (type === 'praise') return '😎 Льстец';
     return '✨ AI Live';
