@@ -8,6 +8,12 @@ import { maybeEnsureWalletForWebhook } from './launch-wallet.js';
 import { consumePurchaseRate, maybeRateLimitPurchaseWebhook, purchaseRateResponse } from './purchase-rate.js';
 import { handleSubscriptionApi, recordRecurringPayment } from './subscription-control.js';
 
+const LAUNCH_TOKEN_PACKS = Object.freeze({
+  start: { tokens: 60, stars: 25 },
+  creator: { tokens: 250, stars: 79 },
+  studio: { tokens: 800, stars: 199 }
+});
+
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
@@ -17,6 +23,10 @@ function json(data, status = 200) {
       'X-Content-Type-Options': 'nosniff'
     }
   });
+}
+
+function changes(result) {
+  return Number(result?.meta?.changes ?? result?.changes ?? 0);
 }
 
 function testPaymentsEnabled(env) {
@@ -87,6 +97,67 @@ async function maybeBlockUnconsentedCheckout(request, env) {
   return json({ ok: true });
 }
 
+async function maybeHandleSingleUseTokenCheckout(request, env) {
+  let update;
+  try { update = await request.clone().json(); }
+  catch (_) { return null; }
+  const query = update?.pre_checkout_query;
+  const invoicePayload = String(query?.invoice_payload || '');
+  if (!query || !invoicePayload.startsWith('pct:')) return null;
+
+  if (!env.DB) {
+    await telegramApi(env, 'answerPreCheckoutQuery', {
+      pre_checkout_query_id: query.id,
+      ok: false,
+      error_message: 'PromptCam AI billing временно недоступен. Попробуй позже.'
+    });
+    return json({ ok: true });
+  }
+
+  try {
+    const order = await env.DB.prepare(`
+      SELECT id, telegram_id, pack, tokens, stars, currency, status
+      FROM ai_token_orders
+      WHERE invoice_payload = ?
+      LIMIT 1
+    `).bind(invoicePayload).first();
+    const pack = order ? LAUNCH_TOKEN_PACKS[order.pack] : null;
+    const baseValid = Boolean(
+      order && pack &&
+      String(order.telegram_id) === String(query.from?.id || '') &&
+      query.currency === 'XTR' &&
+      Number(query.total_amount) === Number(order.stars) &&
+      Number(query.total_amount) === Number(pack.stars) &&
+      Number(order.tokens) === Number(pack.tokens) &&
+      ['pending', 'invoice_sent'].includes(String(order.status || ''))
+    );
+
+    let valid = false;
+    if (baseValid) {
+      const claim = await env.DB.prepare(`
+        UPDATE ai_token_orders
+        SET status = 'paid_uncredited'
+        WHERE id = ? AND status IN ('pending', 'invoice_sent')
+      `).bind(order.id).run();
+      valid = changes(claim) > 0;
+    }
+
+    await telegramApi(env, 'answerPreCheckoutQuery', {
+      pre_checkout_query_id: query.id,
+      ok: valid,
+      ...(valid ? {} : { error_message: 'Этот счёт уже использован или устарел. Создай новый счёт PromptCam AI.' })
+    });
+    return json({ ok: true });
+  } catch (_) {
+    await telegramApi(env, 'answerPreCheckoutQuery', {
+      pre_checkout_query_id: query.id,
+      ok: false,
+      error_message: 'Не удалось проверить пакет PromptCam AI. Создай новый счёт.'
+    });
+    return json({ ok: true });
+  }
+}
+
 async function patchBillingMe(request, env, ctx) {
   const response = await app.fetch(request, env, ctx);
   if (!response.ok) return response;
@@ -155,6 +226,9 @@ export default {
 
       const consentBlock = await maybeBlockUnconsentedCheckout(request, env);
       if (consentBlock) return consentBlock;
+
+      const tokenCheckout = await maybeHandleSingleUseTokenCheckout(request, env);
+      if (tokenCheckout) return tokenCheckout;
 
       const billingResponse = await maybeHandleLaunchBillingWebhook(request, env);
       if (billingResponse) {
