@@ -30,6 +30,33 @@
   };
   window.PromptCamTelegram = bridge;
 
+  // Signal Telegram as soon as the first deferred script runs. This keeps the
+  // native Mini App loading placeholder from waiting on optional AI modules.
+  if (isTelegram) {
+    try { tg.ready(); } catch (_) { /* Older clients may ignore this. */ }
+  }
+
+  function loadEditorShell() {
+    if (!document.querySelector('link[data-promptcam-editor-tabs]')) {
+      const link = document.createElement('link');
+      link.rel = 'stylesheet';
+      link.href = '/editor-tabs.css';
+      link.dataset.promptcamEditorTabs = 'true';
+      document.head.append(link);
+    }
+    if (document.querySelector('script[data-promptcam-editor-tabs]')) return;
+    const script = document.createElement('script');
+    script.src = '/editor-tabs.js';
+    script.dataset.promptcamEditorTabs = 'true';
+    document.head.append(script);
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', loadEditorShell, { once: true });
+  } else {
+    loadEditorShell();
+  }
+
   if (!isTelegram) return;
 
   const byId = (id) => document.getElementById(id);
@@ -62,7 +89,6 @@
     }
   }
 
-  safe(() => tg.ready());
   enforceFullscreenPolicy();
   safe(() => tg.setHeaderColor('#09090d'));
   safe(() => tg.setBackgroundColor('#09090d'));

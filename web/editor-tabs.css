@@ -1,0 +1,120 @@
+.editor-shell {
+  padding-bottom: calc(92px + var(--safe-bottom));
+}
+
+.editor-tabs {
+  position: sticky;
+  z-index: 6;
+  top: max(6px, var(--safe-top));
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 5px;
+  margin: 14px 0 12px;
+  padding: 5px;
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: 15px;
+  background: rgba(12,12,21,.86);
+  box-shadow: 0 10px 30px rgba(0,0,0,.22);
+  backdrop-filter: blur(18px) saturate(130%);
+  -webkit-backdrop-filter: blur(18px) saturate(130%);
+}
+
+.editor-tab {
+  min-width: 0;
+  min-height: 38px;
+  padding: 6px 4px;
+  border: 0;
+  border-radius: 11px;
+  background: transparent;
+  color: #858092;
+  font-size: 10px;
+  font-weight: 720;
+  line-height: 1.12;
+}
+
+.editor-tab.is-selected {
+  background: rgba(255,255,255,.09);
+  color: #f4f1ff;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.06);
+}
+
+.editor-tab-panel {
+  min-height: 180px;
+}
+
+.editor-tab-panel[hidden] {
+  display: none !important;
+}
+
+.editor-tab-panel .script-heading,
+.editor-tab-panel .settings-heading {
+  margin-top: 4px;
+}
+
+.editor-tab-placeholder {
+  display: grid;
+  min-height: 180px;
+  place-items: center;
+  padding: 24px 18px;
+  border: 1px dashed rgba(255,255,255,.08);
+  border-radius: 16px;
+  color: #777284;
+  text-align: center;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.editor-camera-dock {
+  position: fixed;
+  z-index: 18;
+  left: max(12px, env(safe-area-inset-left, 0px));
+  right: max(12px, env(safe-area-inset-right, 0px));
+  bottom: max(10px, var(--safe-bottom));
+  display: none;
+  justify-content: center;
+  pointer-events: none;
+}
+
+html:not([data-telegram="true"]) .editor-camera-dock,
+html[data-telegram="false"] .editor-camera-dock,
+html[data-promptcam-native-main-button="false"] .editor-camera-dock {
+  display: flex;
+}
+
+.editor-camera-dock .camera-cta {
+  width: min(100%, 560px);
+  min-height: 54px;
+  margin: 0;
+  padding: 0 17px;
+  border: 1px solid rgba(255,255,255,.14);
+  border-radius: 16px;
+  background: rgba(18,18,28,.94);
+  box-shadow: 0 12px 38px rgba(0,0,0,.42), inset 0 1px 0 rgba(255,255,255,.07);
+  color: #fff;
+  pointer-events: auto;
+  backdrop-filter: blur(18px) saturate(130%);
+  -webkit-backdrop-filter: blur(18px) saturate(130%);
+}
+
+.editor-camera-dock .camera-cta::before,
+.editor-camera-dock .camera-cta::after {
+  opacity: .9;
+}
+
+.editor-camera-dock .camera-cta > .cta-sub {
+  color: rgba(255,255,255,.58);
+}
+
+.editor-camera-dock .camera-cta:disabled {
+  opacity: .45;
+}
+
+.editor-screen.editor-tabs-ready .privacy-note {
+  margin-top: 10px;
+  padding-bottom: 8px;
+}
+
+@media (max-width: 390px) {
+  .editor-tabs { gap: 3px; padding: 4px; }
+  .editor-tab { font-size: 9px; }
+}
