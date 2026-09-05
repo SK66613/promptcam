@@ -1,6 +1,7 @@
 import app from './speech-entry.js';
 import { maybeHandleTakeDirector } from './take-director.js';
 import { handleScriptAi } from './script-ai.js';
+import { handleFavoriteScript } from './favorite-script.js';
 import { handleCreatorLibrary } from './creator-library.js';
 
 const SPEECH_CONTEXT_MODES = new Set(['crew', 'acting']);
@@ -105,6 +106,11 @@ export default {
     if (url.pathname === '/api/ai/script') {
       if (request.method !== 'POST') return methodNotAllowed();
       return handleScriptAi(request, env, ctx);
+    }
+
+    if (url.pathname === '/api/ai/favorite-insert') {
+      if (request.method !== 'POST') return methodNotAllowed();
+      return handleFavoriteScript(request, env, ctx);
     }
 
     if (url.pathname === '/api/ai/live' && request.method === 'POST') {
