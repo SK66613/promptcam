@@ -146,8 +146,28 @@
     document.head.append(script);
   }
 
+  function loadScriptAi() {
+    if (!document.querySelector('link[data-promptcam-script-ai]')) {
+      const link = document.createElement('link');
+      link.rel = 'stylesheet';
+      link.href = '/script-ai.css';
+      link.dataset.promptcamScriptAi = 'true';
+      document.head.append(link);
+    }
+    if (document.querySelector('script[data-promptcam-script-ai]')) return;
+    const script = document.createElement('script');
+    script.src = '/script-ai.js';
+    script.dataset.promptcamScriptAi = 'true';
+    document.head.append(script);
+  }
+
   ensureControls();
   loadTakeDirector();
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', loadScriptAi, { once: true });
+  } else {
+    loadScriptAi();
+  }
 
   window.PromptCamLiveAIStyles = Object.freeze({
     getStyle: () => selectedStyle,
