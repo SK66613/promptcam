@@ -52,6 +52,10 @@
     setTextIfChanged(document.querySelector('#liveAiPanel .live-ai-copy'), LIVE_COPY);
   }
 
+  function acceptedFrom(data) {
+    return Boolean(data?.termsAccepted ?? data?.accepted);
+  }
+
   async function postLegal(action = 'status') {
     const response = await fetch('/api/legal', {
       method: 'POST',
@@ -59,7 +63,7 @@
       body: JSON.stringify({
         initData,
         action,
-        ...(action === 'accept' ? { termsVersion: state.termsVersion, privacyVersion: state.privacyVersion } : {})
+        ...(action === 'accept' ? { termsVersion: state.termsVersion } : {})
       }),
       cache: 'no-store',
       credentials: 'same-origin'
@@ -93,15 +97,15 @@
       ? 'Проверяю условия покупки…'
       : state.accepted
         ? '✓ Условия покупки приняты.'
-        : 'Перед покупкой через Telegram Stars нужно принять условия PromptCam.';
+        : 'Перед покупкой через Telegram Stars нужно принять Условия использования PromptCam.';
     gate.append(copy);
 
     const links = document.createElement('div');
     links.className = 'promptcam-legal-links';
     const terms = document.createElement('a');
-    terms.href = '/terms.html'; terms.target = '_blank'; terms.rel = 'noopener'; terms.textContent = 'Условия';
+    terms.href = '/terms.html'; terms.target = '_blank'; terms.rel = 'noopener'; terms.textContent = 'Условия использования';
     const privacy = document.createElement('a');
-    privacy.href = '/privacy.html'; privacy.target = '_blank'; privacy.rel = 'noopener'; privacy.textContent = 'Конфиденциальность';
+    privacy.href = '/privacy.html'; privacy.target = '_blank'; privacy.rel = 'noopener'; privacy.textContent = 'Политика конфиденциальности';
     links.append(terms, privacy);
     gate.append(links);
 
@@ -112,7 +116,7 @@
     const check = document.createElement('input');
     check.type = 'checkbox';
     const text = document.createElement('span');
-    text.textContent = 'Я прочитал(а) и принимаю Условия использования и Политику конфиденциальности.';
+    text.textContent = 'Я прочитал(а) и принимаю Условия использования PromptCam.';
     label.append(check, text);
 
     const accept = document.createElement('button');
@@ -128,7 +132,7 @@
       accept.textContent = 'Сохраняю…';
       try {
         const data = await postLegal('accept');
-        state.accepted = Boolean(data.accepted);
+        state.accepted = acceptedFrom(data);
         state.termsVersion = String(data.termsVersion || state.termsVersion);
         state.privacyVersion = String(data.privacyVersion || state.privacyVersion);
         applyAll();
@@ -269,7 +273,7 @@
   (async () => {
     try {
       const data = await postLegal('status');
-      state.accepted = Boolean(data.accepted);
+      state.accepted = acceptedFrom(data);
       state.termsVersion = String(data.termsVersion || '');
       state.privacyVersion = String(data.privacyVersion || '');
     } catch (_) {
@@ -283,7 +287,7 @@
   window.PromptCamLegal = Object.freeze({
     refresh: async () => {
       const data = await postLegal('status');
-      state.accepted = Boolean(data.accepted);
+      state.accepted = acceptedFrom(data);
       state.termsVersion = String(data.termsVersion || '');
       state.privacyVersion = String(data.privacyVersion || '');
       state.loaded = true;

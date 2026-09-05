@@ -1,6 +1,7 @@
 import app from './token-entry.js';
 import { ensureWalletWebhook } from './ai-wallet-launch.js';
 import { handleLegalApi, hasCurrentConsent, requireMiniAppConsent } from './legal.js';
+import { maybeHandlePolicyWebhook } from './bot-policy.js';
 import { maybeHandleLegalWebhook } from './bot-legal.js';
 import { maybeHandleSubscriptionWebhook, refreshSubscriptionHub } from './bot-subscription.js';
 import { handleLaunchBillingInvoice, LAUNCH_PLANS, maybeHandleLaunchBillingWebhook } from './pro-billing-launch.js';
@@ -220,6 +221,9 @@ export default {
 
       const subscriptionResponse = await maybeHandleSubscriptionWebhook(request, env);
       if (subscriptionResponse) return subscriptionResponse;
+
+      const policyResponse = await maybeHandlePolicyWebhook(request, env);
+      if (policyResponse) return policyResponse;
 
       const legalResponse = await maybeHandleLegalWebhook(request, env);
       if (legalResponse) return legalResponse;

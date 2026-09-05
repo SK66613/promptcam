@@ -6,6 +6,8 @@
 
 - Включить Two-Step Verification на Telegram-аккаунте владельца BotFather.
 - Проверить, что Mini App origin protection в BotFather не отключалась.
+- В `@BotFather` зарегистрировать собственную Privacy Policy PromptCam: `${TELEGRAM_WEBHOOK_ORIGIN}/privacy.html`. В Settings Mini App должна быть доступна системная кнопка Privacy Policy.
+- Privacy Policy не является purchase-consent gate: перед Stars-покупкой пользователь отдельно подтверждает только актуальные Условия использования PromptCam.
 - `wrangler.jsonc` должен указывать production D1 `promptcam-prod`, `worker/security-entry.js` и `PROMPTCAM_ENV=production`.
 - Cloudflare Worker secrets должны существовать:
   - `TELEGRAM_BOT_TOKEN`
@@ -76,7 +78,7 @@ npx wrangler deploy --dry-run
 4. FREE video содержит watermark.
 5. AI token balance открывается; тестовый ⭐1 пакет отсутствует.
 6. До принятия Terms Stars purchase заблокирован.
-7. Принять актуальные Terms/Privacy; повторный вход помнит versioned consent.
+7. Принять актуальные Terms; повторный вход помнит versioned Terms consent. Privacy Policy открывается отдельно через ссылку/`/privacy`/Telegram Settings и не блокирует Stars purchase.
 8. Token purchase: 60 = ⭐25; balance увеличился ровно один раз; ledger/order = credited.
 9. После успешной token purchase повторное открытие **того же invoice** не должно приводить ко второму списанию: повторный pre-checkout должен быть отклонён как использованный счёт.
 10. Pro day = ⭐25; `/api/me` возвращает Pro; следующая запись без watermark.
@@ -84,7 +86,7 @@ npx wrangler deploy --dry-run
 12. Monthly = ⭐199 создаётся как recurring invoice link; интерфейс явно показывает auto-renew.
 13. Monthly cancel не отнимает текущий доступ; resume снова разрешает renewal.
 14. После cancel/resume проверить состояние и в Mini App, и через `/pro`.
-15. Bot `/terms`, `/privacy`, `/tokens`, `/pro`, `/paysupport` работают.
+15. Bot `/terms`, `/privacy`, `/tokens`, `/pro`, `/paysupport` работают. `/terms` предлагает принять Terms, `/privacy` только открывает Privacy Policy без consent-кнопки.
 16. `/paysupport` + следующее сообщение создаёт `support_tickets` row.
 17. Library/template/favorite, AI Take Director, Speech Context и Script AI работают после billing changes.
 
