@@ -116,9 +116,26 @@
   right: max(13px, var(--app-safe-right));
   bottom: calc(244px + var(--app-safe-bottom));
 }
+
+/* During REC, keep the controls that do not change the MediaRecorder track live. */
 .camera-screen.is-recording .camera-tool-rail {
-  visibility: hidden;
+  visibility: visible;
+  pointer-events: auto;
+}
+.camera-screen.is-recording #liveAiButton,
+.camera-screen.is-recording #cameraSettingsToggle {
+  visibility: visible;
+  pointer-events: auto;
+}
+.camera-screen.is-recording .camera-settings {
+  visibility: visible;
+  pointer-events: auto;
+}
+.camera-screen.is-recording #switchCameraButton {
+  visibility: visible;
   pointer-events: none;
+  opacity: .38;
+  filter: saturate(.65);
 }
 
 @media (max-height: 690px) {
