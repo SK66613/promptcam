@@ -1,4 +1,4 @@
-import { refreshPaymentHub } from './bot-payment-hub.js';
+import { refreshLaunchPaymentHub } from './bot-legal.js';
 
 function paymentTarget(update) {
   const message = update?.message;
@@ -35,7 +35,7 @@ export async function refreshHubAfterSuccessfulPayment(request, env) {
 
   const target = paymentTarget(update);
   if (!target) return false;
-  return refreshPaymentHub(env, target.telegramId, {
+  return refreshLaunchPaymentHub(env, target.telegramId, {
     view: target.view,
     notice: target.notice,
     chatId: target.telegramId
