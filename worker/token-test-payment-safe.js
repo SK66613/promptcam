@@ -1,10 +1,5 @@
-const TOKEN_PAYLOAD_PREFIX = 'pct:';
-
-const PACKS = Object.freeze({
-  start: { id: 'start', tokens: 60, stars: 25 },
-  creator: { id: 'creator', tokens: 250, stars: 79 },
-  studio: { id: 'studio', tokens: 800, stars: 199 }
-});
+const PAYLOAD_PREFIX = 'pcttest:';
+const TEST_PACK = Object.freeze({ id: 'test60', tokens: 60, stars: 1 });
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -21,7 +16,7 @@ function changes(result) {
   return Number(result?.meta?.changes ?? result?.changes ?? 0);
 }
 
-export async function maybeHandleSafeTokenPayment(request, env) {
+export async function maybeHandleSafeTestTokenPayment(request, env) {
   if (request.method !== 'POST' || !env.DB || !env.TELEGRAM_WEBHOOK_SECRET) return null;
   const provided = request.headers.get('X-Telegram-Bot-Api-Secret-Token') || '';
   if (provided !== env.TELEGRAM_WEBHOOK_SECRET) return null;
@@ -33,25 +28,23 @@ export async function maybeHandleSafeTokenPayment(request, env) {
   const message = update?.message;
   const payment = message?.successful_payment;
   const invoicePayload = String(payment?.invoice_payload || '');
-  if (!payment || !invoicePayload.startsWith(TOKEN_PAYLOAD_PREFIX)) return null;
+  if (!payment || !invoicePayload.startsWith(PAYLOAD_PREFIX)) return null;
 
   const telegramId = String(message?.from?.id || '');
-  if (!telegramId || payment.currency !== 'XTR') return json({ ok: true, ignored: true });
+  if (!telegramId || payment.currency !== 'XTR' || Number(payment.total_amount) !== TEST_PACK.stars) {
+    return json({ ok: true, ignored: true });
+  }
 
   try {
     const order = await env.DB.prepare(`
       SELECT id, telegram_id, pack, tokens, stars, status, telegram_payment_charge_id
-      FROM ai_token_orders
-      WHERE invoice_payload = ?
-      LIMIT 1
+      FROM ai_token_orders WHERE invoice_payload = ? LIMIT 1
     `).bind(invoicePayload).first();
 
     if (!order || String(order.telegram_id) !== telegramId) return json({ ok: true, ignored: true });
-    const pack = PACKS[order.pack];
-    if (!pack || Number(order.tokens) !== pack.tokens || Number(order.stars) !== pack.stars) {
+    if (order.pack !== TEST_PACK.id || Number(order.tokens) !== TEST_PACK.tokens || Number(order.stars) !== TEST_PACK.stars) {
       return json({ ok: true, ignored: true });
     }
-    if (Number(payment.total_amount) !== pack.stars) return json({ ok: true, ignored: true });
 
     const chargeId = String(payment.telegram_payment_charge_id || '');
     if (!chargeId) return json({ ok: true, ignored: true });
@@ -62,7 +55,6 @@ export async function maybeHandleSafeTokenPayment(request, env) {
 
     const paidAt = Number(message.date || Math.floor(Date.now() / 1000));
     const claim = `crediting:${crypto.randomUUID()}`;
-
     const results = await env.DB.batch([
       env.DB.prepare(`
         UPDATE ai_token_orders
@@ -73,17 +65,11 @@ export async function maybeHandleSafeTokenPayment(request, env) {
       `).bind(claim, chargeId, paidAt, order.id, chargeId),
       env.DB.prepare(`
         UPDATE ai_token_wallets
-        SET balance = balance + ?,
-            lifetime_purchased = lifetime_purchased + ?,
-            low_alert_sent = 0,
-            empty_alert_sent = 0,
-            updated_at = ?
+        SET balance = balance + ?, lifetime_purchased = lifetime_purchased + ?,
+            low_alert_sent = 0, empty_alert_sent = 0, updated_at = ?
         WHERE telegram_id = ?
-          AND EXISTS (
-            SELECT 1 FROM ai_token_orders
-            WHERE id = ? AND status = ?
-          )
-      `).bind(pack.tokens, pack.tokens, paidAt, telegramId, order.id, claim),
+          AND EXISTS (SELECT 1 FROM ai_token_orders WHERE id = ? AND status = ?)
+      `).bind(TEST_PACK.tokens, TEST_PACK.tokens, paidAt, telegramId, order.id, claim),
       env.DB.prepare(`
         INSERT INTO ai_token_ledger (
           telegram_id, delta, balance_after, kind, feature, reference, stars, created_at
@@ -91,21 +77,14 @@ export async function maybeHandleSafeTokenPayment(request, env) {
         SELECT ?, ?, balance, 'purchase', '', ?, ?, ?
         FROM ai_token_wallets
         WHERE telegram_id = ?
-          AND EXISTS (
-            SELECT 1 FROM ai_token_orders
-            WHERE id = ? AND status = ?
-          )
-      `).bind(telegramId, pack.tokens, order.id, pack.stars, paidAt, telegramId, order.id, claim),
-      env.DB.prepare(`
-        UPDATE ai_token_orders
-        SET status = 'credited'
-        WHERE id = ? AND status = ?
-      `).bind(order.id, claim)
+          AND EXISTS (SELECT 1 FROM ai_token_orders WHERE id = ? AND status = ?)
+      `).bind(telegramId, TEST_PACK.tokens, order.id, TEST_PACK.stars, paidAt, telegramId, order.id, claim),
+      env.DB.prepare(`UPDATE ai_token_orders SET status = 'credited' WHERE id = ? AND status = ?`).bind(order.id, claim)
     ]);
 
     const claimed = changes(results?.[0]) > 0;
     return json({ ok: true, credited: claimed, duplicate: !claimed });
   } catch (_) {
-    return json({ ok: false, error: 'token_payment_credit_failed' }, 500);
+    return json({ ok: false, error: 'token_test_credit_failed' }, 500);
   }
 }
