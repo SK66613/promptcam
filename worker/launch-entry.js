@@ -1,5 +1,5 @@
 import app from './token-entry.js';
-import { handleLegalApi, requireMiniAppConsent } from './legal.js';
+import { handleLegalApi, hasCurrentConsent, requireMiniAppConsent } from './legal.js';
 import { maybeHandleLegalWebhook, refreshLaunchPaymentHub } from './bot-legal.js';
 import { handleLaunchBillingInvoice, LAUNCH_PLANS, maybeHandleLaunchBillingWebhook } from './pro-billing-launch.js';
 import { maybeEnsureWalletForWebhook } from './launch-wallet.js';
@@ -69,6 +69,24 @@ async function maybeBlockTestWebhook(request, env) {
   return null;
 }
 
+async function maybeBlockUnconsentedCheckout(request, env) {
+  let update;
+  try { update = await request.clone().json(); }
+  catch (_) { return null; }
+  const checkout = update?.pre_checkout_query;
+  if (!checkout) return null;
+  const payload = String(checkout.invoice_payload || '');
+  if (!payload.startsWith('pc:') && !payload.startsWith('pct:') && !payload.startsWith('pcttest:')) return null;
+  const telegramId = String(checkout.from?.id || '');
+  if (!telegramId || await hasCurrentConsent(env, telegramId)) return null;
+  await telegramApi(env, 'answerPreCheckoutQuery', {
+    pre_checkout_query_id: checkout.id,
+    ok: false,
+    error_message: 'Перед оплатой открой PromptCam или /terms и прими актуальные условия покупки.'
+  });
+  return json({ ok: true });
+}
+
 async function patchBillingMe(request, env, ctx) {
   const response = await app.fetch(request, env, ctx);
   if (!response.ok) return response;
@@ -110,6 +128,9 @@ export default {
 
       const testBlock = await maybeBlockTestWebhook(request, env);
       if (testBlock) return testBlock;
+
+      const consentBlock = await maybeBlockUnconsentedCheckout(request, env);
+      if (consentBlock) return consentBlock;
 
       const billingResponse = await maybeHandleLaunchBillingWebhook(request, env);
       if (billingResponse) {
