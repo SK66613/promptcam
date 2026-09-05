@@ -19,6 +19,7 @@
       .promptcam-subscription-control button{min-height:36px;border:1px solid rgba(255,255,255,.09);border-radius:10px;background:rgba(255,255,255,.035);color:#bbb4c7;font-size:10px;font-weight:760}
       .promptcam-subscription-control[data-canceled="false"] button{border-color:rgba(255,166,79,.2);color:#e6bd91}.promptcam-subscription-control[data-canceled="true"] button{border-color:rgba(112,206,154,.22);color:#9edbb7}
       .promptcam-subscription-control button:disabled{opacity:.5}
+      .promptcam-active-pro-note{margin:9px 1px 0;color:#8b8497;font-size:9.5px;line-height:1.4}
     `;
     document.head.append(style);
   }
@@ -50,11 +51,8 @@
 
   function ask(message) {
     return new Promise((resolve) => {
-      if (typeof tg?.showConfirm === 'function') {
-        tg.showConfirm(message, (value) => resolve(Boolean(value)));
-      } else {
-        resolve(window.confirm(message));
-      }
+      if (typeof tg?.showConfirm === 'function') tg.showConfirm(message, (value) => resolve(Boolean(value)));
+      else resolve(window.confirm(message));
     });
   }
 
@@ -78,9 +76,31 @@
     }
   }
 
+  function guardPlanPurchases(host) {
+    const access = window.PromptCamBilling?.state?.access || {};
+    const active = Boolean(access.pro);
+    const plans = host.querySelector('.promptcam-tariff-plans');
+    if (plans) plans.hidden = active;
+    let note = host.querySelector('.promptcam-active-pro-note');
+    if (active) {
+      if (!note) {
+        note = document.createElement('p');
+        note.className = 'promptcam-active-pro-note';
+        const current = host.querySelector('.promptcam-tariff-current');
+        (current || host).insertAdjacentElement?.('afterend', note);
+        if (!note.isConnected) host.prepend(note);
+      }
+      note.textContent = 'Пока Pro активен, второй тариф не продаётся — это защищает от случайного двойного списания Stars.';
+    } else {
+      note?.remove();
+    }
+  }
+
   function render() {
     const host = document.getElementById('promptcamTariffHubContent');
     if (!host) return;
+    guardPlanPurchases(host);
+
     const old = host.querySelector('.promptcam-subscription-control');
     if (!subscription?.recurring || !subscription?.active || !subscription?.canManage) {
       old?.remove();
@@ -99,12 +119,18 @@
     card.replaceChildren();
 
     const title = document.createElement('strong');
-    title.textContent = subscription.canceled ? 'Автопродление остановлено' : 'Автопродление включено';
+    title.textContent = subscription.canceled
+      ? 'Автопродление остановлено'
+      : subscription.lastState === 'failed'
+        ? 'Последнее продление не прошло'
+        : 'Автопродление включено';
     const hint = document.createElement('small');
     const until = dateLabel(subscription.expiresAt);
     hint.textContent = subscription.canceled
       ? `Текущий Pro остаётся активным${until ? ` до ${until}` : ' до конца оплаченного периода'}. Новых списаний не будет.`
-      : `Следующее продление происходит по правилам Telegram Stars${until ? ` после текущего периода до ${until}` : ''}.`;
+      : subscription.lastState === 'failed'
+        ? `Текущий доступ остаётся до ${until || 'конца оплаченного периода'}. Проверь баланс Stars перед следующим продлением.`
+        : `Следующее продление происходит по правилам Telegram Stars${until ? ` после текущего периода до ${until}` : ''}.`;
     const button = document.createElement('button');
     button.type = 'button';
     button.disabled = loading;
@@ -133,10 +159,6 @@
   injectStyles();
   window.addEventListener('promptcam:billing', schedule);
   window.addEventListener('promptcam:editor-hub-ready', schedule);
-  window.addEventListener('promptcam:editor-tab', (event) => {
-    if (event.detail?.tab === 'ai') return;
-    schedule();
-  });
   document.addEventListener('click', (event) => {
     if (event.target?.closest?.('[data-hub-action="tariff"]')) schedule();
   }, true);
