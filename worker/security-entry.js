@@ -35,6 +35,27 @@ function json(data, status = 200) {
   });
 }
 
+function configuredProductionOrigin(env) {
+  const configured = String(env.TELEGRAM_WEBHOOK_ORIGIN || '').trim();
+  if (!configured) return '';
+  try {
+    const url = new URL(configured);
+    if (url.protocol !== 'https:' || url.username || url.password) return '';
+    return url.origin;
+  } catch (_) {
+    return '';
+  }
+}
+
+function productionApiOriginGate(env, url) {
+  if (!url.pathname.startsWith('/api/')) return null;
+  if (String(env.PROMPTCAM_ENV || '').toLowerCase() !== 'production') return null;
+  const expectedOrigin = configuredProductionOrigin(env);
+  if (!expectedOrigin) return json({ ok: false, error: 'production_origin_not_configured' }, 503);
+  if (url.origin !== expectedOrigin) return json({ ok: false, error: 'untrusted_api_origin' }, 421);
+  return null;
+}
+
 function telegramWebhookGate(request, env, url) {
   if (url.pathname !== '/api/telegram/webhook' || request.method !== 'POST') return null;
   const expected = String(env.TELEGRAM_WEBHOOK_SECRET || '');
@@ -71,6 +92,9 @@ export default {
   async fetch(request, env, ctx) {
     try {
       const url = new URL(request.url);
+      const originBlock = productionApiOriginGate(env, url);
+      if (originBlock) return secureResponse(originBlock);
+
       const webhookBlock = telegramWebhookGate(request, env, url);
       if (webhookBlock) return secureResponse(webhookBlock);
 
