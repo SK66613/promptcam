@@ -59,16 +59,19 @@ export async function ensureLegalSchema(env) {
   }
 }
 
+// Purchase consent is intentionally Terms-only. privacy_version remains in the
+// existing table as an informational snapshot of the policy that was published
+// when Terms were accepted; changing Privacy Policy must not re-lock purchases.
 export async function hasCurrentConsent(env, telegramId) {
   if (!telegramId || !await ensureLegalSchema(env)) return false;
   try {
     const row = await env.DB.prepare(`
-      SELECT terms_version, privacy_version
+      SELECT terms_version
       FROM legal_consents
       WHERE telegram_id = ?
       LIMIT 1
     `).bind(String(telegramId)).first();
-    return row?.terms_version === TERMS_VERSION && row?.privacy_version === PRIVACY_VERSION;
+    return row?.terms_version === TERMS_VERSION;
   } catch (_) {
     return false;
   }
@@ -110,6 +113,8 @@ export function legalRequiredResponse() {
   return json({
     ok: false,
     error: 'legal_consent_required',
+    termsAccepted: false,
+    privacyAcceptanceRequired: false,
     termsVersion: TERMS_VERSION,
     privacyVersion: PRIVACY_VERSION,
     termsUrl: '/terms.html',
@@ -136,8 +141,13 @@ export async function handleLegalApi(request, env, ctx, app) {
   if (!await ensureLegalSchema(env)) return json({ ok: false, error: 'legal_database_unavailable' }, 503);
 
   if (body?.action === 'accept') {
-    if (body?.termsVersion !== TERMS_VERSION || body?.privacyVersion !== PRIVACY_VERSION) {
-      return json({ ok: false, error: 'legal_version_mismatch', termsVersion: TERMS_VERSION, privacyVersion: PRIVACY_VERSION }, 409);
+    if (body?.termsVersion !== TERMS_VERSION) {
+      return json({
+        ok: false,
+        error: 'legal_version_mismatch',
+        termsVersion: TERMS_VERSION,
+        privacyVersion: PRIVACY_VERSION
+      }, 409);
     }
     const saved = await saveConsent(env, user.id);
     if (!saved) return json({ ok: false, error: 'legal_consent_save_failed' }, 503);
@@ -147,6 +157,8 @@ export async function handleLegalApi(request, env, ctx, app) {
   return json({
     ok: true,
     accepted,
+    termsAccepted: accepted,
+    privacyAcceptanceRequired: false,
     termsVersion: TERMS_VERSION,
     privacyVersion: PRIVACY_VERSION,
     termsUrl: '/terms.html',
