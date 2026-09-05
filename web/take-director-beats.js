@@ -2,6 +2,7 @@
   'use strict';
 
   const panel = document.getElementById('liveAiPanel');
+  const cameraView = document.getElementById('cameraView');
   const prompterText = document.getElementById('prompterText');
   const prompterScroller = document.getElementById('prompterScroller');
   if (!panel || !prompterText || !prompterScroller) return;
@@ -303,12 +304,19 @@
     });
   }
 
-  const observer = new MutationObserver(scheduleRender);
-  observer.observe(panel, { childList: true, subtree: true });
+  const panelObserver = new MutationObserver(scheduleRender);
+  panelObserver.observe(panel, { childList: true, subtree: true });
+  const scriptObserver = new MutationObserver(scheduleRender);
+  scriptObserver.observe(prompterText, { childList: true, subtree: true, characterData: true });
+  const cameraObserver = cameraView ? new MutationObserver(scheduleRender) : null;
+  cameraObserver?.observe(cameraView, { attributes: true, attributeFilter: ['class'] });
   prompterScroller.addEventListener('scroll', scheduleRender, { passive: true });
   window.addEventListener('promptcam:creator-modules-ready', scheduleRender);
-  window.addEventListener('promptcam:take-beat-response', scheduleRender);
-  window.addEventListener('pagehide', () => observer.disconnect());
+  window.addEventListener('pagehide', () => {
+    panelObserver.disconnect();
+    scriptObserver.disconnect();
+    cameraObserver?.disconnect();
+  });
 
   scheduleRender();
 
