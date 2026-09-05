@@ -35,6 +35,15 @@ function json(data, status = 200) {
   });
 }
 
+function telegramWebhookGate(request, env, url) {
+  if (url.pathname !== '/api/telegram/webhook' || request.method !== 'POST') return null;
+  const expected = String(env.TELEGRAM_WEBHOOK_SECRET || '');
+  if (!expected) return json({ ok: false, error: 'telegram_webhook_not_configured' }, 503);
+  const provided = request.headers.get('X-Telegram-Bot-Api-Secret-Token') || '';
+  if (!provided || provided !== expected) return json({ ok: false, error: 'invalid_webhook_secret' }, 401);
+  return null;
+}
+
 async function maybeHandleSubscriptionUpdate(request, env, ctx) {
   const url = new URL(request.url);
   if (url.pathname !== '/api/telegram/webhook' || request.method !== 'POST' || !env.TELEGRAM_WEBHOOK_SECRET) return null;
@@ -62,6 +71,9 @@ export default {
   async fetch(request, env, ctx) {
     try {
       const url = new URL(request.url);
+      const webhookBlock = telegramWebhookGate(request, env, url);
+      if (webhookBlock) return secureResponse(webhookBlock);
+
       if (url.pathname.startsWith('/api/')) ensureWalletWebhook(request, env, ctx).catch(() => {});
 
       const subscriptionResponse = await maybeHandleSubscriptionUpdate(request, env, ctx);
