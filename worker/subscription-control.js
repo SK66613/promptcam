@@ -38,6 +38,7 @@ export async function ensureSubscriptionSchema(env) {
           telegram_id TEXT PRIMARY KEY,
           telegram_payment_charge_id TEXT NOT NULL,
           is_canceled INTEGER NOT NULL DEFAULT 0,
+          last_state TEXT NOT NULL DEFAULT 'active',
           updated_at INTEGER NOT NULL
         )
       `),
@@ -46,6 +47,9 @@ export async function ensureSubscriptionSchema(env) {
         ON subscription_controls (telegram_payment_charge_id)
       `)
     ]);
+    try {
+      await env.DB.prepare(`ALTER TABLE subscription_controls ADD COLUMN last_state TEXT NOT NULL DEFAULT 'active'`).run();
+    } catch (_) { /* already present */ }
     return true;
   } catch (_) {
     return false;
@@ -83,20 +87,20 @@ async function currentEntitlement(env, telegramId) {
 
 export async function getSubscriptionStatus(env, telegramId) {
   if (!telegramId || !await ensureSubscriptionSchema(env)) {
-    return { active: false, recurring: false, canceled: false, canManage: false, expiresAt: 0 };
+    return { active: false, recurring: false, canceled: false, canManage: false, expiresAt: 0, lastState: '' };
   }
   const entitlement = await currentEntitlement(env, telegramId);
   const now = Math.floor(Date.now() / 1000);
   const active = Number(entitlement?.access_until || 0) > now;
   const recurring = active && Boolean(Number(entitlement?.recurring || 0)) && String(entitlement?.plan || '') === 'month';
   if (!recurring) {
-    return { active, recurring: false, canceled: false, canManage: false, expiresAt: active ? Number(entitlement?.access_until || 0) : 0 };
+    return { active, recurring: false, canceled: false, canManage: false, expiresAt: active ? Number(entitlement?.access_until || 0) : 0, lastState: '' };
   }
 
   let control = null;
   try {
     control = await env.DB.prepare(`
-      SELECT telegram_payment_charge_id, is_canceled
+      SELECT telegram_payment_charge_id, is_canceled, last_state
       FROM subscription_controls
       WHERE telegram_id = ?
       LIMIT 1
@@ -112,6 +116,7 @@ export async function getSubscriptionStatus(env, telegramId) {
     canceled: Boolean(Number(control?.is_canceled || 0)),
     canManage: Boolean(chargeId),
     expiresAt: Number(entitlement?.access_until || 0),
+    lastState: String(control?.last_state || 'active'),
     chargeId
   };
 }
@@ -122,20 +127,47 @@ export async function recordRecurringPayment(env, telegramId, chargeId, isFirstR
   try {
     if (isFirstRecurring) {
       await env.DB.prepare(`
-        INSERT INTO subscription_controls (telegram_id, telegram_payment_charge_id, is_canceled, updated_at)
-        VALUES (?, ?, 0, ?)
+        INSERT INTO subscription_controls (telegram_id, telegram_payment_charge_id, is_canceled, last_state, updated_at)
+        VALUES (?, ?, 0, 'active', ?)
         ON CONFLICT(telegram_id) DO UPDATE SET
           telegram_payment_charge_id = excluded.telegram_payment_charge_id,
           is_canceled = 0,
+          last_state = 'active',
           updated_at = excluded.updated_at
       `).bind(String(telegramId), String(chargeId), now).run();
     } else {
       await env.DB.prepare(`
         UPDATE subscription_controls
-        SET is_canceled = 0, updated_at = ?
+        SET is_canceled = 0, last_state = 'active', updated_at = ?
         WHERE telegram_id = ?
       `).bind(now, String(telegramId)).run();
     }
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+
+export async function syncSubscriptionUpdate(env, update) {
+  const telegramId = String(update?.user?.id || '');
+  const state = String(update?.state || '');
+  if (!telegramId || !['canceled', 'active', 'failed'].includes(state) || !await ensureSubscriptionSchema(env)) return false;
+  const chargeId = await firstRecurringCharge(env, telegramId) || String((await currentEntitlement(env, telegramId))?.telegram_payment_charge_id || '');
+  if (!chargeId) return false;
+  const now = Math.floor(Date.now() / 1000);
+  try {
+    await env.DB.prepare(`
+      INSERT INTO subscription_controls (telegram_id, telegram_payment_charge_id, is_canceled, last_state, updated_at)
+      VALUES (?, ?, ?, ?, ?)
+      ON CONFLICT(telegram_id) DO UPDATE SET
+        telegram_payment_charge_id = CASE
+          WHEN subscription_controls.telegram_payment_charge_id != '' THEN subscription_controls.telegram_payment_charge_id
+          ELSE excluded.telegram_payment_charge_id
+        END,
+        is_canceled = excluded.is_canceled,
+        last_state = excluded.last_state,
+        updated_at = excluded.updated_at
+    `).bind(telegramId, chargeId, state === 'canceled' ? 1 : 0, state, now).run();
     return true;
   } catch (_) {
     return false;
@@ -156,13 +188,14 @@ export async function editSubscriptionForUser(env, telegramId, cancel) {
     });
     const now = Math.floor(Date.now() / 1000);
     await env.DB.prepare(`
-      INSERT INTO subscription_controls (telegram_id, telegram_payment_charge_id, is_canceled, updated_at)
-      VALUES (?, ?, ?, ?)
+      INSERT INTO subscription_controls (telegram_id, telegram_payment_charge_id, is_canceled, last_state, updated_at)
+      VALUES (?, ?, ?, ?, ?)
       ON CONFLICT(telegram_id) DO UPDATE SET
         telegram_payment_charge_id = excluded.telegram_payment_charge_id,
         is_canceled = excluded.is_canceled,
+        last_state = excluded.last_state,
         updated_at = excluded.updated_at
-    `).bind(String(telegramId), status.chargeId, cancel ? 1 : 0, now).run();
+    `).bind(String(telegramId), status.chargeId, cancel ? 1 : 0, cancel ? 'canceled' : 'active', now).run();
     return { ok: true, status: await getSubscriptionStatus(env, telegramId) };
   } catch (error) {
     return { ok: false, error: 'subscription_edit_failed', detail: String(error?.description || '').slice(0, 180), status };
