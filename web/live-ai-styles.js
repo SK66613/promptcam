@@ -147,6 +147,15 @@
     document.head.append(link);
   }
 
+  function ensureCreatorLibraryStyles() {
+    if (document.querySelector('link[data-promptcam-creator-library]')) return;
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = '/creator-library.css';
+    link.dataset.promptcamCreatorLibrary = 'true';
+    document.head.append(link);
+  }
+
   function loadScriptOnce(src, attribute) {
     return new Promise((resolve, reject) => {
       const existing = document.querySelector(`script[${attribute}]`);
@@ -172,8 +181,10 @@
 
   async function loadCreatorModules() {
     ensureScriptAiStyles();
+    ensureCreatorLibraryStyles();
     try {
       await loadScriptOnce('/script-ai.js', 'data-promptcam-script-ai');
+      await loadScriptOnce('/creator-library.js', 'data-promptcam-creator-library');
       await loadScriptOnce('/take-director-beats.js', 'data-promptcam-take-beats');
       await loadScriptOnce('/take-director.js', 'data-promptcam-take-director');
       window.dispatchEvent(new CustomEvent('promptcam:creator-modules-ready'));
