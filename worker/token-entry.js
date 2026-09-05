@@ -12,24 +12,6 @@ import { maybeHandlePaymentHub } from './bot-payment-hub.js';
 import { queueHubAfterSuccessfulPayment } from './bot-payment-hub-hooks.js';
 import { ensureBotUserFromWebhook } from './bot-user-bootstrap.js';
 
-async function refreshWalletWebhook(request, env) {
-  if (!env.TELEGRAM_BOT_TOKEN || !env.TELEGRAM_WEBHOOK_SECRET) return;
-  const url = new URL(request.url);
-  try {
-    await fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/setWebhook`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        url: `${url.origin}/api/telegram/webhook`,
-        secret_token: env.TELEGRAM_WEBHOOK_SECRET,
-        allowed_updates: ['message', 'pre_checkout_query', 'callback_query', 'subscription']
-      })
-    });
-  } catch (_) {
-    // Keep the current webhook if Telegram is temporarily unavailable.
-  }
-}
-
 function finishWebhook(response, paymentProbe, env, ctx) {
   if (response?.ok && paymentProbe) queueHubAfterSuccessfulPayment(paymentProbe, env, ctx);
   return response;
@@ -79,11 +61,7 @@ export default {
 
     if (url.pathname === '/api/billing/invoice' && request.method === 'POST') {
       const response = await app.fetch(request, env, ctx);
-      if (response.ok) {
-        const refresh = refreshWalletWebhook(request, env);
-        if (ctx && typeof ctx.waitUntil === 'function') ctx.waitUntil(refresh);
-        else refresh.catch(() => {});
-      }
+      if (response.ok) ensureWalletWebhook(request, env, ctx).catch(() => {});
       return response;
     }
 
