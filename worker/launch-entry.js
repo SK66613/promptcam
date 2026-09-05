@@ -20,7 +20,8 @@ function json(data, status = 200) {
 }
 
 function testPaymentsEnabled(env) {
-  return String(env.ENABLE_TEST_PAYMENTS || '') === '1';
+  return String(env.PROMPTCAM_ENV || '').toLowerCase() === 'test' &&
+    String(env.ENABLE_TEST_PAYMENTS || '') === '1';
 }
 
 async function readJsonClone(request) {
