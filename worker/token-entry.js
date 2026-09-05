@@ -6,6 +6,7 @@ import {
   meterAiRequest
 } from './ai-wallet.js';
 import { maybeHandleSafeTokenPayment } from './token-payment-safe.js';
+import { maybeHandleSafeTestTokenPayment } from './token-test-payment-safe.js';
 import { handleTestPackApi, maybeHandleTestTokenWebhook } from './token-test-pack.js';
 import { maybeHandlePaymentHub } from './bot-payment-hub.js';
 import { queueHubAfterSuccessfulPayment } from './bot-payment-hub-hooks.js';
@@ -38,20 +39,28 @@ export default {
     const url = new URL(request.url);
 
     if (url.pathname === '/api/telegram/webhook' && request.method === 'POST') {
-      // Commands and the inline payment menu belong to one editable hub message.
-      // This must run before the legacy /tokens handler.
+      // Commands and inline navigation belong to one editable payment hub message.
+      // This must run before legacy /tokens callbacks and menu messages.
       const hubResponse = await maybeHandlePaymentHub(request, env);
       if (hubResponse) return hubResponse;
 
-      const testTokenResponse = await maybeHandleTestTokenWebhook(request, env);
-      if (testTokenResponse) return finishWebhook(testTokenResponse, request, env, ctx);
+      // Successful token payments are credited by silent idempotent handlers first,
+      // then the existing hub message is refreshed in place.
+      const safeTestPayment = await maybeHandleSafeTestTokenPayment(request, env);
+      if (safeTestPayment) return finishWebhook(safeTestPayment, request, env, ctx);
 
       const safePaymentResponse = await maybeHandleSafeTokenPayment(request, env);
       if (safePaymentResponse) return finishWebhook(safePaymentResponse, request, env, ctx);
 
+      // Legacy handlers remain for pre_checkout_query and old inline buttons that may
+      // still exist in a user's chat from earlier PromptCam versions.
+      const testTokenResponse = await maybeHandleTestTokenWebhook(request, env);
+      if (testTokenResponse) return finishWebhook(testTokenResponse, request, env, ctx);
+
       const tokenResponse = await maybeHandleTokenWebhook(request, env, ctx);
       if (tokenResponse) return finishWebhook(tokenResponse, request, env, ctx);
 
+      // PromptCam Pro billing remains the source of truth for entitlement/watermark.
       const response = await app.fetch(request, env, ctx);
       return finishWebhook(response, request, env, ctx);
     }
