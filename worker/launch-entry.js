@@ -1,8 +1,18 @@
 import app from './token-entry.js';
+import { ensureWalletWebhook } from './ai-wallet-launch.js';
 import { handleLegalApi, hasCurrentConsent, requireMiniAppConsent } from './legal.js';
-import { maybeHandleLegalWebhook, refreshLaunchPaymentHub } from './bot-legal.js';
+import { maybeHandleLegalWebhook } from './bot-legal.js';
+import { maybeHandleSubscriptionWebhook, refreshSubscriptionHub } from './bot-subscription.js';
 import { handleLaunchBillingInvoice, LAUNCH_PLANS, maybeHandleLaunchBillingWebhook } from './pro-billing-launch.js';
 import { maybeEnsureWalletForWebhook } from './launch-wallet.js';
+import { consumePurchaseRate, maybeRateLimitPurchaseWebhook, purchaseRateResponse } from './purchase-rate.js';
+import { handleSubscriptionApi, recordRecurringPayment } from './subscription-control.js';
+
+const LAUNCH_TOKEN_PACKS = Object.freeze({
+  start: { tokens: 60, stars: 25 },
+  creator: { tokens: 250, stars: 79 },
+  studio: { tokens: 800, stars: 199 }
+});
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -15,8 +25,13 @@ function json(data, status = 200) {
   });
 }
 
+function changes(result) {
+  return Number(result?.meta?.changes ?? result?.changes ?? 0);
+}
+
 function testPaymentsEnabled(env) {
-  return String(env.ENABLE_TEST_PAYMENTS || '') === '1';
+  return String(env.PROMPTCAM_ENV || '').toLowerCase() === 'test' &&
+    String(env.ENABLE_TEST_PAYMENTS || '') === '1';
 }
 
 async function readJsonClone(request) {
@@ -43,7 +58,6 @@ async function maybeBlockTestWebhook(request, env) {
   let update;
   try { update = await request.clone().json(); }
   catch (_) { return null; }
-
   const query = update?.callback_query;
   const callbackData = String(query?.data || '');
   if (query && (callbackData === 'ait:buy:test60' || callbackData === 'pch:token:test60')) {
@@ -53,7 +67,6 @@ async function maybeBlockTestWebhook(request, env) {
     });
     return json({ ok: true });
   }
-
   const checkout = update?.pre_checkout_query;
   if (checkout && String(checkout.invoice_payload || '').startsWith('pcttest:')) {
     await telegramApi(env, 'answerPreCheckoutQuery', {
@@ -63,9 +76,6 @@ async function maybeBlockTestWebhook(request, env) {
     });
     return json({ ok: true });
   }
-
-  // If Telegram already charged an old test invoice, let the existing idempotent
-  // successful_payment handler deliver the purchased tokens.
   return null;
 }
 
@@ -87,6 +97,67 @@ async function maybeBlockUnconsentedCheckout(request, env) {
   return json({ ok: true });
 }
 
+async function maybeHandleSingleUseTokenCheckout(request, env) {
+  let update;
+  try { update = await request.clone().json(); }
+  catch (_) { return null; }
+  const query = update?.pre_checkout_query;
+  const invoicePayload = String(query?.invoice_payload || '');
+  if (!query || !invoicePayload.startsWith('pct:')) return null;
+
+  if (!env.DB) {
+    await telegramApi(env, 'answerPreCheckoutQuery', {
+      pre_checkout_query_id: query.id,
+      ok: false,
+      error_message: 'PromptCam AI billing временно недоступен. Попробуй позже.'
+    });
+    return json({ ok: true });
+  }
+
+  try {
+    const order = await env.DB.prepare(`
+      SELECT id, telegram_id, pack, tokens, stars, currency, status
+      FROM ai_token_orders
+      WHERE invoice_payload = ?
+      LIMIT 1
+    `).bind(invoicePayload).first();
+    const pack = order ? LAUNCH_TOKEN_PACKS[order.pack] : null;
+    const baseValid = Boolean(
+      order && pack &&
+      String(order.telegram_id) === String(query.from?.id || '') &&
+      query.currency === 'XTR' &&
+      Number(query.total_amount) === Number(order.stars) &&
+      Number(query.total_amount) === Number(pack.stars) &&
+      Number(order.tokens) === Number(pack.tokens) &&
+      ['pending', 'invoice_sent'].includes(String(order.status || ''))
+    );
+
+    let valid = false;
+    if (baseValid) {
+      const claim = await env.DB.prepare(`
+        UPDATE ai_token_orders
+        SET status = 'paid_uncredited'
+        WHERE id = ? AND status IN ('pending', 'invoice_sent')
+      `).bind(order.id).run();
+      valid = changes(claim) > 0;
+    }
+
+    await telegramApi(env, 'answerPreCheckoutQuery', {
+      pre_checkout_query_id: query.id,
+      ok: valid,
+      ...(valid ? {} : { error_message: 'Этот счёт уже использован или устарел. Создай новый счёт PromptCam AI.' })
+    });
+    return json({ ok: true });
+  } catch (_) {
+    await telegramApi(env, 'answerPreCheckoutQuery', {
+      pre_checkout_query_id: query.id,
+      ok: false,
+      error_message: 'Не удалось проверить пакет PromptCam AI. Создай новый счёт.'
+    });
+    return json({ ok: true });
+  }
+}
+
 async function patchBillingMe(request, env, ctx) {
   const response = await app.fetch(request, env, ctx);
   if (!response.ok) return response;
@@ -99,46 +170,72 @@ async function patchBillingMe(request, env, ctx) {
   return json(data, response.status);
 }
 
-function queueLaunchProHubRefresh(update, env, ctx) {
+function queueLaunchProPostPayment(update, env, ctx) {
   const payment = update?.message?.successful_payment;
   const telegramId = String(update?.message?.from?.id || '');
   if (!payment || !telegramId || !String(payment.invoice_payload || '').startsWith('pc:')) return;
-  const work = refreshLaunchPaymentHub(env, telegramId, {
-    view: 'pro',
-    notice: '✅ Оплата PromptCam Pro прошла. Тариф и доступ обновлены.',
-    chatId: telegramId
-  }).catch(() => false);
+  const work = (async () => {
+    if (payment.is_first_recurring || payment.is_recurring) {
+      await recordRecurringPayment(
+        env,
+        telegramId,
+        String(payment.telegram_payment_charge_id || ''),
+        Boolean(payment.is_first_recurring)
+      );
+    }
+    await refreshSubscriptionHub(env, telegramId, {
+      notice: '✅ Оплата PromptCam Pro прошла. Тариф и доступ обновлены.',
+      chatId: telegramId
+    });
+  })().catch(() => false);
   if (ctx && typeof ctx.waitUntil === 'function') ctx.waitUntil(work);
+}
+
+async function purchaseRateOrResponse(env, telegramId) {
+  const rate = await consumePurchaseRate(env, telegramId);
+  if (rate.ok) return null;
+  if (!rate.configured) return json({ ok: false, error: 'purchase_rate_database_unavailable' }, 503);
+  return purchaseRateResponse(rate.retryAfter);
 }
 
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
-
-    if (url.pathname === '/api/legal') {
-      return handleLegalApi(request, env, ctx, app);
+    if (url.pathname.startsWith('/api/') && url.pathname !== '/api/telegram/webhook') {
+      ensureWalletWebhook(request, env, ctx).catch(() => {});
     }
+
+    if (url.pathname === '/api/legal') return handleLegalApi(request, env, ctx, app);
+    if (url.pathname === '/api/billing/subscription') return handleSubscriptionApi(request, env, ctx, app);
 
     if (url.pathname === '/api/telegram/webhook' && request.method === 'POST') {
       const paymentProbe = request.clone();
       await maybeEnsureWalletForWebhook(request, env);
 
-      const legalResponse = await maybeHandleLegalWebhook(request, env);
-      if (legalResponse) return legalResponse;
-
       const testBlock = await maybeBlockTestWebhook(request, env);
       if (testBlock) return testBlock;
+
+      const purchaseRate = await maybeRateLimitPurchaseWebhook(request, env);
+      if (purchaseRate) return purchaseRate;
+
+      const subscriptionResponse = await maybeHandleSubscriptionWebhook(request, env);
+      if (subscriptionResponse) return subscriptionResponse;
+
+      const legalResponse = await maybeHandleLegalWebhook(request, env);
+      if (legalResponse) return legalResponse;
 
       const consentBlock = await maybeBlockUnconsentedCheckout(request, env);
       if (consentBlock) return consentBlock;
 
+      const tokenCheckout = await maybeHandleSingleUseTokenCheckout(request, env);
+      if (tokenCheckout) return tokenCheckout;
+
       const billingResponse = await maybeHandleLaunchBillingWebhook(request, env);
       if (billingResponse) {
         const update = await paymentProbe.json().catch(() => null);
-        queueLaunchProHubRefresh(update, env, ctx);
+        queueLaunchProPostPayment(update, env, ctx);
         return billingResponse;
       }
-
       return app.fetch(request, env, ctx);
     }
 
@@ -146,15 +243,15 @@ export default {
       return json({ ok: false, error: 'test_payments_disabled' }, 404);
     }
 
-    if (url.pathname === '/api/me' && request.method === 'POST') {
-      return patchBillingMe(request, env, ctx);
-    }
+    if (url.pathname === '/api/me' && request.method === 'POST') return patchBillingMe(request, env, ctx);
 
     if (url.pathname === '/api/billing/invoice' && request.method === 'POST') {
       const body = await readJsonClone(request);
       if (!body) return json({ ok: false, error: 'invalid_json' }, 400);
       const consent = await requireMiniAppConsent(request, env, ctx, app, body);
       if (!consent.ok) return consent.response;
+      const rateResponse = await purchaseRateOrResponse(env, consent.user.id);
+      if (rateResponse) return rateResponse;
       return handleLaunchBillingInvoice(request, env, consent.user, body);
     }
 
@@ -163,6 +260,8 @@ export default {
       if (body?.action === 'buy_pack') {
         const consent = await requireMiniAppConsent(request, env, ctx, app, body);
         if (!consent.ok) return consent.response;
+        const rateResponse = await purchaseRateOrResponse(env, consent.user.id);
+        if (rateResponse) return rateResponse;
       }
     }
 

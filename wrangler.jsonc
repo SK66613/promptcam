@@ -1,9 +1,23 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "promptcam",
-  "main": "./worker/launch-entry.js",
+  "main": "./worker/security-entry.js",
   "compatibility_date": "2026-09-03",
   "keep_vars": true,
+  "vars": {
+    "PROMPTCAM_ENV": "production"
+  },
+  "secrets": {
+    "required": [
+      "TELEGRAM_BOT_TOKEN",
+      "TELEGRAM_WEBHOOK_SECRET",
+      "OPENAI_API_KEY"
+    ]
+  },
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1
+  },
   "assets": {
     "directory": "./web",
     "binding": "ASSETS",
