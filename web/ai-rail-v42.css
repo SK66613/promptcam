@@ -1,0 +1,33 @@
+/* v42: the rail button glow is the ON state; the only badge is the token balance. */
+html .live-ai-active-dot { display: none !important; }
+
+html .camera-tool-button.live-ai-tool.is-active::after,
+html .live-ai-tool[data-ai-tokens]::after {
+  content: '⚡' attr(data-ai-tokens) !important;
+  position: absolute !important;
+  top: -6px !important;
+  right: -7px !important;
+  width: auto !important;
+  min-width: 28px !important;
+  height: 18px !important;
+  display: grid !important;
+  place-items: center !important;
+  padding: 0 5px !important;
+  border: 1px solid rgba(122,94,255,.4) !important;
+  border-radius: 999px !important;
+  background: rgba(10,9,19,.96) !important;
+  color: #ddd4ff !important;
+  font-size: 7.5px !important;
+  font-weight: 900 !important;
+  line-height: 1 !important;
+  box-shadow: 0 4px 12px rgba(0,0,0,.35) !important;
+}
+
+html .live-ai-tool[data-token-state="low"]::after {
+  color: #ffd17d !important;
+  border-color: rgba(255,190,65,.45) !important;
+}
+html .live-ai-tool[data-token-state="empty"]::after {
+  color: #ff8ea0 !important;
+  border-color: rgba(255,86,112,.46) !important;
+}

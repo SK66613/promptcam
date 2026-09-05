@@ -10,9 +10,6 @@
   const settingsStack = shell?.querySelector('.settings-stack');
   const openCameraButton = document.getElementById('openCameraButton');
   const privacyNote = shell?.querySelector('.privacy-note');
-  const camera = document.getElementById('cameraView');
-  const resultDialog = document.getElementById('resultDialog');
-  const paywallDialog = document.getElementById('paywallDialog');
   const scriptInput = document.getElementById('scriptInput');
   if (!editor || !shell || !brand || !scriptHeading || !editorCard || !settingsHeading || !settingsStack || !openCameraButton) return;
 
@@ -50,7 +47,7 @@
 
   const aiPlaceholder = document.createElement('div');
   aiPlaceholder.className = 'editor-tab-placeholder';
-  aiPlaceholder.textContent = 'AI для сценария загружается…';
+  aiPlaceholder.textContent = 'Настройки AI Live загружаются…';
   panels.get('ai').append(aiPlaceholder);
 
   const libraryPlaceholder = document.createElement('div');
@@ -60,6 +57,13 @@
 
   panels.get('script').append(scriptHeading, editorCard);
   panels.get('settings').append(settingsHeading, settingsStack);
+  if (privacyNote) panels.get('script').append(privacyNote);
+
+  // Keep the original camera CTA as a hidden programmatic trigger. app.js, Telegram
+  // fullscreen handling and permission logic continue to use this exact button.
+  openCameraButton.classList.add('promptcam-legacy-camera-trigger');
+  openCameraButton.hidden = true;
+  panels.get('script').append(openCameraButton);
 
   brand.after(tabs);
   let anchor = tabs;
@@ -68,12 +72,6 @@
     anchor.after(panel);
     anchor = panel;
   }
-
-  const dock = document.createElement('div');
-  dock.className = 'editor-camera-dock';
-  dock.append(openCameraButton);
-  shell.after(dock);
-  if (privacyNote) panels.get('script').append(privacyNote);
 
   function readTab() {
     try {
@@ -95,18 +93,23 @@
     try { sessionStorage.setItem(STORAGE_KEY, next); } catch (_) { /* optional */ }
     if (focus) buttons.get(next)?.focus({ preventScroll: true });
     window.scrollTo({ top: 0, behavior: 'smooth' });
+    window.dispatchEvent(new CustomEvent('promptcam:editor-tab', { detail: { tab: next } }));
   }
 
-  for (const [key, button] of buttons) {
-    button.addEventListener('click', () => setTab(key));
-  }
+  for (const [key, button] of buttons) button.addEventListener('click', () => setTab(key));
 
   function mountDynamicCards() {
     const scriptAiCard = document.querySelector('.script-ai-card');
-    if (scriptAiCard && scriptAiCard.parentElement !== panels.get('ai')) {
-      aiPlaceholder.remove();
-      panels.get('ai').append(scriptAiCard);
+    if (scriptAiCard && scriptAiCard.parentElement !== panels.get('script')) {
+      editorCard.insertAdjacentElement('afterend', scriptAiCard);
     }
+
+    const aiSetup = document.querySelector('.promptcam-ai-setup-card');
+    if (aiSetup && aiSetup.parentElement !== panels.get('ai')) {
+      aiPlaceholder.remove();
+      panels.get('ai').append(aiSetup);
+    }
+
     const libraryCard = document.querySelector('.creator-library-card');
     if (libraryCard && libraryCard.parentElement !== panels.get('library')) {
       libraryPlaceholder.remove();
@@ -118,10 +121,6 @@
   observer.observe(shell, { childList: true, subtree: true });
   mountDynamicCards();
 
-  function editorIsVisible() {
-    return !editor.classList.contains('hidden') && !camera?.classList.contains('is-recording') && !resultDialog?.open && !paywallDialog?.open;
-  }
-
   function scriptReady() {
     return Boolean(scriptInput?.value.trim());
   }
@@ -130,87 +129,75 @@
     if (!scriptReady()) {
       setTab('script');
       scriptInput?.focus();
-      openCameraButton.click();
-      return;
+      return false;
     }
     openCameraButton.click();
-  }
-
-  let nativeMainButton = false;
-  let mainButtonHandler = null;
-
-  function configureTelegramMainButton() {
-    const mainButton = tg?.MainButton;
-    if (!tg?.initData || !mainButton || typeof mainButton.show !== 'function') {
-      document.documentElement.dataset.promptcamNativeMainButton = 'false';
-      return false;
-    }
-
-    nativeMainButton = true;
-    document.documentElement.dataset.promptcamNativeMainButton = 'true';
-    mainButtonHandler = openCamera;
-    try {
-      mainButton.setText?.('Открыть камеру');
-      if (typeof mainButton.setParams === 'function') {
-        mainButton.setParams({ text: 'Открыть камеру', is_visible: true, is_active: scriptReady(), has_shine_effect: true });
-      }
-      mainButton.onClick?.(mainButtonHandler);
-    } catch (_) {
-      nativeMainButton = false;
-      document.documentElement.dataset.promptcamNativeMainButton = 'false';
-      return false;
-    }
-    syncMainButton();
     return true;
   }
 
-  function syncMainButton() {
-    if (!nativeMainButton) return;
-    const mainButton = tg?.MainButton;
-    if (!mainButton) return;
-    try {
-      if (editorIsVisible()) {
-        mainButton.setText?.('Открыть камеру');
-        if (scriptReady()) mainButton.enable?.();
-        else mainButton.disable?.();
-        mainButton.show?.();
-      } else {
-        mainButton.hide?.();
+  // The expandable PromptCam dock replaces Telegram MainButton on the editor.
+  try { tg?.MainButton?.hide?.(); } catch (_) { /* optional */ }
+  document.documentElement.dataset.promptcamNativeMainButton = 'false';
+
+  function loadScriptOnce(src, attribute) {
+    return new Promise((resolve, reject) => {
+      const existing = document.querySelector(`script[${attribute}]`);
+      if (existing) {
+        if (existing.dataset.promptcamReady === 'true') resolve(existing);
+        else {
+          existing.addEventListener('load', () => resolve(existing), { once: true });
+          existing.addEventListener('error', reject, { once: true });
+        }
+        return;
       }
-    } catch (_) { /* Telegram clients differ by version. */ }
+      const script = document.createElement('script');
+      script.src = src;
+      script.setAttribute(attribute, 'true');
+      script.addEventListener('load', () => {
+        script.dataset.promptcamReady = 'true';
+        resolve(script);
+      }, { once: true });
+      script.addEventListener('error', reject, { once: true });
+      document.head.append(script);
+    });
   }
 
-  scriptInput?.addEventListener('input', syncMainButton);
-  const chromeObserver = new MutationObserver(syncMainButton);
-  chromeObserver.observe(editor, { attributes: true, attributeFilter: ['class', 'aria-hidden'] });
-  if (camera) chromeObserver.observe(camera, { attributes: true, attributeFilter: ['class', 'aria-hidden'] });
-  if (resultDialog) chromeObserver.observe(resultDialog, { attributes: true, attributeFilter: ['open'] });
-  if (paywallDialog) chromeObserver.observe(paywallDialog, { attributes: true, attributeFilter: ['open'] });
+  function loadStyleOnce(href, attribute) {
+    if (document.querySelector(`link[${attribute}]`)) return;
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = href;
+    link.setAttribute(attribute, 'true');
+    document.head.append(link);
+  }
+
+  async function loadEditorHub() {
+    loadStyleOnce('/editor-hub-v42.css?v=42', 'data-promptcam-editor-hub-v42');
+    try {
+      await loadScriptOnce('/editor-hub-v42.js?v=42', 'data-promptcam-editor-hub-v42');
+      await loadScriptOnce('/ai-setup-v42.js?v=42', 'data-promptcam-ai-setup-v42');
+      await loadScriptOnce('/ai-wallet-ui.js?v=42', 'data-promptcam-ai-wallet-ui');
+      mountDynamicCards();
+      window.dispatchEvent(new CustomEvent('promptcam:editor-hub-ready'));
+    } catch (_) {
+      // Existing tabs and camera trigger remain available if an optional hub asset fails.
+    }
+  }
 
   window.addEventListener('promptcam:creator-modules-ready', mountDynamicCards);
-  window.addEventListener('pagehide', () => {
-    observer.disconnect();
-    chromeObserver.disconnect();
-    try {
-      if (nativeMainButton && mainButtonHandler) tg?.MainButton?.offClick?.(mainButtonHandler);
-      tg?.MainButton?.hide?.();
-    } catch (_) { /* optional */ }
-  });
+  window.addEventListener('pagehide', () => observer.disconnect(), { once: true });
 
   setTab(readTab());
-  configureTelegramMainButton();
   editor.classList.add('editor-tabs-ready');
 
   window.PromptCamEditorTabs = Object.freeze({
     setTab,
+    openCamera,
+    scriptReady,
     getTab: () => [...panels.entries()].find(([, panel]) => !panel.hidden)?.[0] || 'script',
-    syncCameraButton: syncMainButton
+    getPanel: (key) => panels.get(key) || null,
+    syncCameraButton: () => window.PromptCamEditorHub?.sync?.()
   });
 
-  if (!document.querySelector('script[data-promptcam-ai-wallet-ui]')) {
-    const walletScript = document.createElement('script');
-    walletScript.src = '/ai-wallet-ui.js?v=40';
-    walletScript.dataset.promptcamAiWalletUi = 'true';
-    document.head.append(walletScript);
-  }
+  loadEditorHub();
 })();
