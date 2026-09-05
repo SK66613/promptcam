@@ -181,6 +181,7 @@
     try {
       await loadScriptOnce('/script-ai.js', 'data-promptcam-script-ai');
       await loadScriptOnce('/creator-library-v37.js?v=37', 'data-promptcam-creator-library');
+      await loadScriptOnce('/favorite-script-visibility.js?v=39', 'data-promptcam-favorite-visibility');
       await loadScriptOnce('/take-director-beats.js', 'data-promptcam-take-beats');
       await loadScriptOnce('/take-director.js', 'data-promptcam-take-director');
       window.dispatchEvent(new CustomEvent('promptcam:creator-modules-ready'));
