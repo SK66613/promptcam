@@ -4,7 +4,7 @@ import {
   handleWalletApi,
   maybeHandleTokenWebhook,
   meterAiRequest
-} from './ai-wallet.js';
+} from './ai-wallet-launch.js';
 import { maybeHandleSafeTokenPayment } from './token-payment-safe.js';
 import { maybeHandleSafeTestTokenPayment } from './token-test-payment-safe.js';
 import { handleTestPackApi, maybeHandleTestTokenWebhook } from './token-test-pack.js';
@@ -22,7 +22,7 @@ async function refreshWalletWebhook(request, env) {
       body: JSON.stringify({
         url: `${url.origin}/api/telegram/webhook`,
         secret_token: env.TELEGRAM_WEBHOOK_SECRET,
-        allowed_updates: ['message', 'pre_checkout_query', 'callback_query']
+        allowed_updates: ['message', 'pre_checkout_query', 'callback_query', 'subscription']
       })
     });
   } catch (_) {
@@ -40,35 +40,24 @@ export default {
     const url = new URL(request.url);
 
     if (url.pathname === '/api/telegram/webhook' && request.method === 'POST') {
-      // Preserve one untouched clone before any downstream billing handler consumes body.
       const paymentProbe = request.clone();
-
-      // Keep billing FK/user metadata valid even when the user opens the shop from bot
-      // before ever opening the Mini App.
       await ensureBotUserFromWebhook(request, env);
 
-      // Commands and inline navigation belong to one editable payment hub message.
-      // This must run before legacy /tokens callbacks and menu messages.
       const hubResponse = await maybeHandlePaymentHub(request, env);
       if (hubResponse) return hubResponse;
 
-      // Successful token payments are credited by silent idempotent handlers first,
-      // then the existing hub message is refreshed in place.
       const safeTestPayment = await maybeHandleSafeTestTokenPayment(request, env);
       if (safeTestPayment) return finishWebhook(safeTestPayment, paymentProbe, env, ctx);
 
       const safePaymentResponse = await maybeHandleSafeTokenPayment(request, env);
       if (safePaymentResponse) return finishWebhook(safePaymentResponse, paymentProbe, env, ctx);
 
-      // Legacy handlers remain for pre_checkout_query and old inline buttons that may
-      // still exist in a user's chat from earlier PromptCam versions.
       const testTokenResponse = await maybeHandleTestTokenWebhook(request, env);
       if (testTokenResponse) return finishWebhook(testTokenResponse, paymentProbe, env, ctx);
 
       const tokenResponse = await maybeHandleTokenWebhook(request, env, ctx);
       if (tokenResponse) return finishWebhook(tokenResponse, paymentProbe, env, ctx);
 
-      // PromptCam Pro billing remains the source of truth for entitlement/watermark.
       const response = await app.fetch(request, env, ctx);
       return finishWebhook(response, paymentProbe, env, ctx);
     }
