@@ -33,9 +33,8 @@ function commandName(text) {
 async function hubRow(env, telegramId) {
   if (!env.DB) return null;
   try {
-    return await env.DB.prepare(`
-      SELECT chat_id, message_id FROM bot_payment_hubs WHERE telegram_id = ? LIMIT 1
-    `).bind(String(telegramId)).first();
+    return await env.DB.prepare(`SELECT chat_id, message_id FROM bot_payment_hubs WHERE telegram_id = ? LIMIT 1`)
+      .bind(String(telegramId)).first();
   } catch (_) { return null; }
 }
 
@@ -52,7 +51,7 @@ async function saveHub(env, telegramId, chatId, messageId) {
         view = 'pro',
         updated_at = excluded.updated_at
     `).bind(String(telegramId), String(chatId), Number(messageId), now).run();
-  } catch (_) { /* hub can still render even if state save fails */ }
+  } catch (_) { /* optional persistence */ }
 }
 
 function dateLabel(seconds) {
@@ -81,17 +80,20 @@ async function accessStatus(env, telegramId) {
   }
 }
 
-function keyboard(subscription) {
-  const rows = [
-    [
-      { text: `1 день · ⭐${LAUNCH_PLANS.day.stars}`, callback_data: 'pch:pro:day' },
-      { text: `7 дней · ⭐${LAUNCH_PLANS.week.stars}`, callback_data: 'pch:pro:week' }
-    ],
-    [
-      { text: `30 дней · ⭐${LAUNCH_PLANS.month.stars}`, callback_data: 'pch:pro:month' },
-      { text: `1 год · ⭐${LAUNCH_PLANS.year.stars}`, callback_data: 'pch:pro:year' }
-    ]
-  ];
+function keyboard(access, subscription) {
+  const rows = [];
+  if (!access?.pro) {
+    rows.push(
+      [
+        { text: `1 день · ⭐${LAUNCH_PLANS.day.stars}`, callback_data: 'pch:pro:day' },
+        { text: `7 дней · ⭐${LAUNCH_PLANS.week.stars}`, callback_data: 'pch:pro:week' }
+      ],
+      [
+        { text: `30 дней · ⭐${LAUNCH_PLANS.month.stars}`, callback_data: 'pch:pro:month' },
+        { text: `1 год · ⭐${LAUNCH_PLANS.year.stars}`, callback_data: 'pch:pro:year' }
+      ]
+    );
+  }
   if (subscription?.recurring && subscription?.canManage) {
     rows.push([{
       text: subscription.canceled ? '🔁 Возобновить автопродление' : '⏸ Остановить автопродление',
@@ -106,17 +108,21 @@ async function payload(env, telegramId, notice = '') {
   const access = await accessStatus(env, telegramId);
   const subscription = await getSubscriptionStatus(env, telegramId);
   let status = 'Сейчас PromptCam Free · новые записи сохраняются с водяным знаком.';
+  let footer = '30 дней — подписка Telegram Stars. Остальные сроки — разовые покупки.';
   if (access.pro) {
     status = `✅ PromptCam Pro активен${access.expiresAt ? ` до ${dateLabel(access.expiresAt)}` : ''}.`;
+    footer = 'Пока Pro активен, второй тариф не продаётся — так мы исключаем случайное двойное списание.';
     if (subscription.recurring) {
       status += subscription.canceled
         ? '\nАвтопродление остановлено. Текущий период остаётся активным до указанной даты.'
-        : '\nАвтопродление включено каждые 30 дней.';
+        : subscription.lastState === 'failed'
+          ? '\nПоследнее продление не прошло. Текущий доступ действует до указанной даты.'
+          : '\nАвтопродление включено каждые 30 дней.';
     }
   }
   return {
-    text: `${notice ? `${notice}\n\n` : ''}⭐ Тариф PromptCam\n\n${status}\n\n30 дней — подписка Telegram Stars. Остальные сроки — разовые покупки.`,
-    reply_markup: keyboard(subscription)
+    text: `${notice ? `${notice}\n\n` : ''}⭐ Тариф PromptCam\n\n${status}\n\n${footer}`,
+    reply_markup: keyboard(access, subscription)
   };
 }
 
@@ -150,10 +156,7 @@ export async function refreshSubscriptionHub(env, telegramId, { chatId = '', mes
 
 async function answerCallback(env, query, text = '') {
   try {
-    await telegramApi(env, 'answerCallbackQuery', {
-      callback_query_id: query.id,
-      ...(text ? { text } : {})
-    });
+    await telegramApi(env, 'answerCallbackQuery', { callback_query_id: query.id, ...(text ? { text } : {}) });
   } catch (_) { /* best effort */ }
 }
 
