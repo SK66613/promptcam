@@ -206,4 +206,11 @@
     getTab: () => [...panels.entries()].find(([, panel]) => !panel.hidden)?.[0] || 'script',
     syncCameraButton: syncMainButton
   });
+
+  if (!document.querySelector('script[data-promptcam-ai-wallet-ui]')) {
+    const walletScript = document.createElement('script');
+    walletScript.src = '/ai-wallet-ui.js?v=40';
+    walletScript.dataset.promptcamAiWalletUi = 'true';
+    document.head.append(walletScript);
+  }
 })();
