@@ -12,6 +12,10 @@ function json(data, status = 200) {
   });
 }
 
+function changes(result) {
+  return Number(result?.meta?.changes ?? result?.changes ?? 0);
+}
+
 async function telegramApi(env, method, payload) {
   if (!env.TELEGRAM_BOT_TOKEN) throw new Error('telegram_not_configured');
   const response = await fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/${method}`, {
@@ -94,7 +98,7 @@ export async function handleLaunchBillingInvoice(request, env, user, body) {
     }
     const order = await createOrder(env, user.id, plan);
     const invoiceUrl = await telegramApi(env, 'createInvoiceLink', invoiceBody(order, plan));
-    await env.DB.prepare(`UPDATE billing_orders SET invoice_url = ? WHERE id = ?`).bind(invoiceUrl, order.id).run();
+    await env.DB.prepare(`UPDATE billing_orders SET invoice_url = ?, status = 'invoice_sent' WHERE id = ?`).bind(invoiceUrl, order.id).run();
     return json({ ok: true, orderId: order.id, invoiceUrl, plan: { id: plan.id, title: plan.title, stars: plan.stars, recurring: plan.recurring } });
   } catch (_) {
     return json({ ok: false, error: 'invoice_creation_failed' }, 502);
@@ -109,6 +113,22 @@ export async function sendLaunchProInvoice(env, telegramId, planId) {
   const access = await activeAccess(env, telegramId);
   if (access.active) throw new Error('pro_already_active');
   const order = await createOrder(env, telegramId, plan);
+
+  if (plan.recurring) {
+    const invoiceUrl = await telegramApi(env, 'createInvoiceLink', invoiceBody(order, plan));
+    await env.DB.prepare(`
+      UPDATE billing_orders SET invoice_url = ?, status = 'invoice_sent' WHERE id = ?
+    `).bind(invoiceUrl, order.id).run();
+    await telegramApi(env, 'sendMessage', {
+      chat_id: String(telegramId),
+      text: `⭐ PromptCam Pro · ${plan.title}\n\n${plan.description}. Оплата: ⭐${plan.stars}. Автопродление можно остановить в разделе Тариф или через /pro.`,
+      reply_markup: {
+        inline_keyboard: [[{ text: `Оплатить ⭐${plan.stars}`, url: invoiceUrl }]]
+      }
+    });
+    return { ...order, invoiceUrl };
+  }
+
   await telegramApi(env, 'sendInvoice', { chat_id: String(telegramId), ...invoiceBody(order, plan) });
   await env.DB.prepare(`UPDATE billing_orders SET status = 'invoice_sent' WHERE id = ?`).bind(order.id).run();
   return order;
@@ -130,19 +150,33 @@ async function handlePreCheckout(env, query) {
       SELECT id, telegram_id, plan, stars, currency, status
       FROM billing_orders WHERE invoice_payload = ? LIMIT 1
     `).bind(String(query.invoice_payload || '')).first();
+    const plan = order ? LAUNCH_PLANS[order.plan] : null;
     const access = order ? await activeAccess(env, order.telegram_id) : { active: false };
-    const overlappingNewPurchase = Boolean(access.active && String(order?.status || '') !== 'paid');
-    const valid = Boolean(
-      order && LAUNCH_PLANS[order.plan] &&
+    const baseValid = Boolean(
+      order && plan &&
       String(order.telegram_id) === String(query.from?.id || '') &&
       query.currency === 'XTR' &&
       Number(query.total_amount) === Number(order.stars) &&
-      !['invoice_failed', 'refunded'].includes(String(order.status || '')) &&
-      !overlappingNewPurchase
+      Number(query.total_amount) === Number(plan.stars) &&
+      ['pending', 'invoice_sent'].includes(String(order.status || '')) &&
+      !access.active
     );
-    const message = overlappingNewPurchase
-      ? 'PromptCam Pro уже активен. Дождись конца периода или управляй автопродлением в разделе Тариф.'
-      : 'Не удалось проверить заказ PromptCam. Создай новый счёт.';
+
+    let valid = false;
+    if (baseValid) {
+      const claim = await env.DB.prepare(`
+        UPDATE billing_orders
+        SET status = 'checkout_approved'
+        WHERE id = ? AND status IN ('pending', 'invoice_sent')
+      `).bind(order.id).run();
+      valid = changes(claim) > 0;
+    }
+
+    const message = access.active
+      ? 'PromptCam Pro уже активен. Управляй автопродлением в разделе Тариф.'
+      : order && !['pending', 'invoice_sent'].includes(String(order.status || ''))
+        ? 'Этот счёт уже использован. Создай новый счёт PromptCam.'
+        : 'Не удалось проверить заказ PromptCam. Создай новый счёт.';
     await answerPreCheckout(env, query, valid, valid ? '' : message);
   } catch (_) {
     await answerPreCheckout(env, query, false, 'PromptCam billing временно недоступен.');
