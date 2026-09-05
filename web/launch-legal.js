@@ -13,6 +13,9 @@
     loaded: false
   };
 
+  const PRIVACY_NOTE = 'Видео записывается на устройстве. При включённом AI отдельные кадры и речевые чанки отправляются AI-провайдеру для обработки.';
+  const LIVE_COPY = 'AI Live анализирует отдельные кадры; Speech Context отправляет только речевые чанки. PromptCam не сохраняет видео, кадры или распознанный текст в D1.';
+
   function injectStyles() {
     if (document.getElementById('promptcamLaunchLegalStyles')) return;
     const style = document.createElement('style');
@@ -32,8 +35,7 @@
   }
 
   function debugPolicy() {
-    const params = new URLSearchParams(location.search);
-    const enabled = params.get('debug') === '1';
+    const enabled = new URLSearchParams(location.search).get('debug') === '1';
     document.documentElement.dataset.promptcamDebug = String(enabled);
     if (!enabled) {
       document.getElementById('pcdbgBtn')?.remove();
@@ -41,11 +43,13 @@
     }
   }
 
+  function setTextIfChanged(node, value) {
+    if (node && node.textContent !== value) node.textContent = value;
+  }
+
   function patchPrivacyCopy() {
-    const note = document.querySelector('.privacy-note');
-    if (note) note.textContent = 'Видео записывается на устройстве. При включённом AI отдельные кадры и речевые чанки отправляются AI-провайдеру для обработки.';
-    const copy = document.querySelector('#liveAiPanel .live-ai-copy');
-    if (copy) copy.textContent = 'AI Live анализирует отдельные кадры; Speech Context отправляет только речевые чанки. PromptCam не сохраняет видео, кадры или распознанный текст в D1.';
+    setTextIfChanged(document.querySelector('.privacy-note'), PRIVACY_NOTE);
+    setTextIfChanged(document.querySelector('#liveAiPanel .live-ai-copy'), LIVE_COPY);
   }
 
   async function postLegal(action = 'status') {
@@ -81,54 +85,75 @@
     gate.className = 'promptcam-legal-gate';
     gate.dataset.legalGate = key;
     gate.dataset.accepted = String(state.accepted);
+    gate.dataset.loaded = String(state.loaded);
+
+    const copy = document.createElement('span');
+    copy.className = 'promptcam-legal-copy';
+    copy.textContent = !state.loaded
+      ? 'Проверяю условия покупки…'
+      : state.accepted
+        ? '✓ Условия покупки приняты.'
+        : 'Перед покупкой через Telegram Stars нужно принять условия PromptCam.';
+    gate.append(copy);
 
     const links = document.createElement('div');
     links.className = 'promptcam-legal-links';
-    const terms = document.createElement('a'); terms.href = '/terms.html'; terms.target = '_blank'; terms.rel = 'noopener'; terms.textContent = 'Условия';
-    const privacy = document.createElement('a'); privacy.href = '/privacy.html'; privacy.target = '_blank'; privacy.rel = 'noopener'; privacy.textContent = 'Конфиденциальность';
+    const terms = document.createElement('a');
+    terms.href = '/terms.html'; terms.target = '_blank'; terms.rel = 'noopener'; terms.textContent = 'Условия';
+    const privacy = document.createElement('a');
+    privacy.href = '/privacy.html'; privacy.target = '_blank'; privacy.rel = 'noopener'; privacy.textContent = 'Конфиденциальность';
     links.append(terms, privacy);
+    gate.append(links);
 
-    const status = document.createElement('span');
-    status.className = 'promptcam-legal-copy';
-    status.textContent = state.accepted ? '✓ Условия покупки приняты.' : 'Перед покупкой через Telegram Stars нужно принять условия PromptCam.';
-    gate.append(status, links);
+    if (!state.loaded || state.accepted) return gate;
 
-    if (!state.accepted) {
-      const label = document.createElement('label');
-      label.className = 'promptcam-legal-check';
-      const check = document.createElement('input'); check.type = 'checkbox';
-      const text = document.createElement('span'); text.textContent = 'Я прочитал(а) и принимаю Условия использования и Политику конфиденциальности.';
-      label.append(check, text);
-      const accept = document.createElement('button'); accept.type = 'button'; accept.className = 'promptcam-legal-accept'; accept.textContent = 'Принять условия'; accept.disabled = true;
-      check.addEventListener('change', () => { accept.disabled = !check.checked; });
-      accept.addEventListener('click', async () => {
-        if (!check.checked || state.loading) return;
-        state.loading = true;
-        accept.disabled = true;
-        accept.textContent = 'Сохраняю…';
-        try {
-          const data = await postLegal('accept');
-          state.accepted = Boolean(data.accepted);
-          applyAll();
-          tg?.HapticFeedback?.notificationOccurred?.('success');
-        } catch (_) {
-          accept.textContent = 'Не удалось · повторить';
-          accept.disabled = false;
-        } finally {
-          state.loading = false;
-        }
-      });
-      gate.append(label, accept);
-    }
+    const label = document.createElement('label');
+    label.className = 'promptcam-legal-check';
+    const check = document.createElement('input');
+    check.type = 'checkbox';
+    const text = document.createElement('span');
+    text.textContent = 'Я прочитал(а) и принимаю Условия использования и Политику конфиденциальности.';
+    label.append(check, text);
+
+    const accept = document.createElement('button');
+    accept.type = 'button';
+    accept.className = 'promptcam-legal-accept';
+    accept.textContent = 'Принять условия';
+    accept.disabled = true;
+    check.addEventListener('change', () => { accept.disabled = !check.checked || state.loading; });
+    accept.addEventListener('click', async () => {
+      if (!state.loaded || !check.checked || state.loading) return;
+      state.loading = true;
+      accept.disabled = true;
+      accept.textContent = 'Сохраняю…';
+      try {
+        const data = await postLegal('accept');
+        state.accepted = Boolean(data.accepted);
+        state.termsVersion = String(data.termsVersion || state.termsVersion);
+        state.privacyVersion = String(data.privacyVersion || state.privacyVersion);
+        applyAll();
+        tg?.HapticFeedback?.notificationOccurred?.('success');
+      } catch (_) {
+        accept.textContent = 'Не удалось · повторить';
+        accept.disabled = false;
+      } finally {
+        state.loading = false;
+      }
+    });
+    gate.append(label, accept);
     return gate;
   }
 
   function renderGates() {
+    const acceptedKey = String(state.accepted);
+    const loadedKey = String(state.loaded);
     for (const target of gateTargets()) {
-      const existing = target.host.querySelector(`:scope > .promptcam-legal-gate[data-legal-gate="${target.key}"]`);
-      if (existing) existing.remove();
+      const selector = `:scope > .promptcam-legal-gate[data-legal-gate="${target.key}"]`;
+      const existing = target.host.querySelector(selector);
+      if (existing?.dataset.accepted === acceptedKey && existing?.dataset.loaded === loadedKey) continue;
       const gate = buildGate(target.key);
-      if (target.before) target.host.insertBefore(gate, target.before);
+      if (existing) existing.replaceWith(gate);
+      else if (target.before) target.host.insertBefore(gate, target.before);
       else target.host.prepend(gate);
     }
   }
@@ -138,9 +163,7 @@
     if (disabled) {
       if (!button.disabled) button.dataset.legalDisabled = 'true';
       button.disabled = true;
-      return;
-    }
-    if (button.dataset.legalDisabled === 'true') {
+    } else if (button.dataset.legalDisabled === 'true') {
       button.disabled = false;
       delete button.dataset.legalDisabled;
     }
@@ -150,7 +173,7 @@
     if (!state.accepted || button.disabled) return;
     button.disabled = true;
     const status = document.querySelector('.ai-wallet-status');
-    if (status) status.textContent = 'Создаю счёт Telegram Stars…';
+    setTextIfChanged(status, 'Создаю счёт Telegram Stars…');
     try {
       const response = await fetch('/api/ai/wallet', {
         method: 'POST',
@@ -162,17 +185,19 @@
       const data = await response.json().catch(() => ({}));
       if (!response.ok || !data?.ok || !data.invoiceUrl) throw new Error(data?.error || 'invoice_failed');
       tg.openInvoice(data.invoiceUrl, async (invoiceStatus) => {
-        if (status) status.textContent = invoiceStatus === 'paid' || invoiceStatus === 'pending' ? 'Платёж принят · обновляю баланс…' : 'Оплата отменена.';
+        setTextIfChanged(status, invoiceStatus === 'paid' || invoiceStatus === 'pending'
+          ? 'Платёж принят · обновляю баланс…'
+          : 'Оплата отменена.');
         if (invoiceStatus === 'paid' || invoiceStatus === 'pending') {
-          for (let i = 0; i < 8; i += 1) {
-            await new Promise((resolve) => setTimeout(resolve, i ? 650 : 250));
+          for (let index = 0; index < 8; index += 1) {
+            await new Promise((resolve) => setTimeout(resolve, index ? 650 : 250));
             await window.PromptCamAIWallet?.refresh?.({ silent: true });
           }
         }
         button.disabled = false;
       });
     } catch (_) {
-      if (status) status.textContent = 'Не удалось создать счёт.';
+      setTextIfChanged(status, 'Не удалось создать счёт.');
       button.disabled = false;
     }
   }
@@ -182,7 +207,8 @@
     if (!shop) return;
     shop.querySelectorAll('.ai-wallet-pack[data-test="true"]').forEach((node) => node.remove());
     shop.querySelectorAll('.ai-wallet-note').forEach((node) => {
-      if (node.textContent.includes('⭐1') || node.textContent.includes('тест')) node.remove();
+      const text = node.textContent.toLowerCase();
+      if (text.includes('⭐1') || text.includes('тест')) node.remove();
     });
 
     let start = shop.querySelector('.promptcam-launch-start-pack');
@@ -196,21 +222,31 @@
       start.addEventListener('click', () => buyStartPack(start));
       shop.prepend(start);
     }
-    setLegalDisabled(start, !state.accepted);
-    shop.querySelectorAll('.ai-wallet-pack:not([data-test="true"]):not(.promptcam-launch-start-pack)').forEach((button) => setLegalDisabled(button, !state.accepted));
+    setLegalDisabled(start, !state.loaded || !state.accepted);
+    shop.querySelectorAll('.ai-wallet-pack:not([data-test="true"]):not(.promptcam-launch-start-pack)')
+      .forEach((button) => setLegalDisabled(button, !state.loaded || !state.accepted));
   }
 
   function gatePurchaseButtons() {
-    document.querySelectorAll('.promptcam-tariff-plan,.plan-option').forEach((button) => setLegalDisabled(button, !state.accepted));
+    const disabled = !state.loaded || !state.accepted;
+    document.querySelectorAll('.promptcam-tariff-plan,.plan-option')
+      .forEach((button) => setLegalDisabled(button, disabled));
   }
 
+  let lastEventKey = '';
   function applyAll() {
     debugPolicy();
     patchPrivacyCopy();
     patchWalletShop();
     gatePurchaseButtons();
     renderGates();
-    window.dispatchEvent(new CustomEvent('promptcam:legal', { detail: { accepted: state.accepted, termsVersion: state.termsVersion } }));
+    const eventKey = `${state.loaded}:${state.accepted}:${state.termsVersion}`;
+    if (eventKey !== lastEventKey) {
+      lastEventKey = eventKey;
+      window.dispatchEvent(new CustomEvent('promptcam:legal', {
+        detail: { accepted: state.accepted, loaded: state.loaded, termsVersion: state.termsVersion }
+      }));
+    }
   }
 
   let timer = 0;
@@ -250,6 +286,7 @@
       state.accepted = Boolean(data.accepted);
       state.termsVersion = String(data.termsVersion || '');
       state.privacyVersion = String(data.privacyVersion || '');
+      state.loaded = true;
       applyAll();
       return { ...state };
     },
