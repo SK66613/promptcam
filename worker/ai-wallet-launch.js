@@ -9,18 +9,30 @@ export { handleWalletApi, maybeHandleTokenWebhook, meterAiRequest };
 let ready = false;
 let pending = null;
 
-export async function ensureWalletWebhook(request, env, ctx) {
+function configuredWebhookUrl(env) {
+  const configured = String(env.TELEGRAM_WEBHOOK_ORIGIN || '').trim();
+  if (!configured) return '';
+  try {
+    const url = new URL(configured);
+    if (url.protocol !== 'https:' || url.username || url.password) return '';
+    return `${url.origin}/api/telegram/webhook`;
+  } catch (_) {
+    return '';
+  }
+}
+
+export async function ensureWalletWebhook(_request, env, ctx) {
   if (ready) return true;
   if (pending) return pending;
-  if (!env.TELEGRAM_BOT_TOKEN || !env.TELEGRAM_WEBHOOK_SECRET) return false;
+  const webhookUrl = configuredWebhookUrl(env);
+  if (!webhookUrl || !env.TELEGRAM_BOT_TOKEN || !env.TELEGRAM_WEBHOOK_SECRET) return false;
   pending = (async () => {
     try {
-      const origin = new URL(request.url).origin;
       const response = await fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/setWebhook`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          url: `${origin}/api/telegram/webhook`,
+          url: webhookUrl,
           secret_token: env.TELEGRAM_WEBHOOK_SECRET,
           allowed_updates: ['message', 'pre_checkout_query', 'callback_query', 'subscription']
         })
