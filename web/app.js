@@ -135,50 +135,73 @@
 
   function friendlyMediaError(error, source = 'camera') {
     if (error?.name === 'NotAllowedError' || error?.name === 'SecurityError') {
+      if (source === 'media') return 'Доступ к камере или микрофону запрещён. Разреши оба для PromptCam в настройках Telegram/браузера и попробуй снова.';
       return source === 'microphone'
         ? 'Доступ к микрофону запрещён. Разреши микрофон для PromptCam в настройках браузера и попробуй снова.'
         : 'Доступ к камере запрещён. Разреши камеру для PromptCam в настройках браузера и попробуй снова.';
     }
     if (error?.name === 'NotFoundError' || error?.name === 'DevicesNotFoundError') {
+      if (source === 'media') return 'Камера или микрофон не найдены или недоступны.';
       return source === 'microphone' ? 'Микрофон не найден или недоступен.' : 'Камера не найдена или недоступна.';
     }
     if (error?.name === 'NotReadableError' || error?.name === 'TrackStartError' || error?.name === 'AbortError') {
+      if (source === 'media') return 'Камера или микрофон сейчас недоступны. Закрой другие приложения, которые могут их использовать, и попробуй снова.';
       return source === 'microphone' ? 'Микрофон занят другим приложением.' : 'Камера сейчас недоступна. Закрой другие приложения с камерой и попробуй снова.';
     }
+    if (source === 'media') return 'Не удалось включить камеру и микрофон. Проверь разрешения и попробуй снова.';
     return source === 'microphone' ? 'Не удалось включить микрофон. Проверь разрешение и попробуй снова.' : 'Не удалось открыть камеру. Проверь разрешение и попробуй снова.';
   }
 
-  async function requestVideo(mode) {
+  function retryableConstraintError(error) {
+    return error?.name === 'OverconstrainedError' || error?.name === 'ConstraintNotSatisfiedError';
+  }
+
+  async function requestMedia(mode, includeAudio = false) {
     try {
-      return await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: mode }, width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false });
+      return await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: mode }, width: { ideal: 1920 }, height: { ideal: 1080 } },
+        audio: Boolean(includeAudio)
+      });
     } catch (firstError) {
-      try { return await navigator.mediaDevices.getUserMedia({ video: { facingMode: mode }, audio: false }); }
-      catch (_) { throw firstError; }
+      if (!retryableConstraintError(firstError)) throw firstError;
+      try {
+        return await navigator.mediaDevices.getUserMedia({ video: { facingMode: mode }, audio: Boolean(includeAudio) });
+      } catch (_) {
+        throw firstError;
+      }
     }
   }
 
   async function startCamera(mode = facingMode, includeAudio = true) {
     if (!navigator.mediaDevices?.getUserMedia) throw { promptcamMessage: 'Этот браузер не поддерживает доступ к камере. Открой PromptCam в Safari или Chrome.' };
     const oldStream = mediaStream;
-    let videoStream;
-    let audioStream;
-    try { videoStream = await requestVideo(mode); }
-    catch (error) { throw { promptcamMessage: friendlyMediaError(error, 'camera') }; }
+    const existingAudio = includeAudio ? oldStream?.getAudioTracks()[0] : null;
+    const reuseAudio = Boolean(existingAudio?.readyState === 'live');
+    let requestedStream;
     try {
-      const existingAudio = oldStream?.getAudioTracks()[0];
-      if (includeAudio && existingAudio?.readyState === 'live') audioStream = new MediaStream([existingAudio]);
-      else if (includeAudio) audioStream = await navigator.mediaDevices.getUserMedia({ video: false, audio: true });
-      const tracks = [...videoStream.getVideoTracks(), ...(audioStream?.getAudioTracks() || [])];
-      mediaStream = new MediaStream(tracks);
+      requestedStream = await requestMedia(mode, includeAudio && !reuseAudio);
+    } catch (error) {
+      throw { promptcamMessage: friendlyMediaError(error, includeAudio && !reuseAudio ? 'media' : 'camera') };
+    }
+
+    try {
+      const videoTracks = requestedStream.getVideoTracks();
+      const audioTracks = reuseAudio ? [existingAudio] : requestedStream.getAudioTracks();
+      if (!videoTracks.length) throw new Error('camera_track_missing');
+      if (includeAudio && !audioTracks.length) throw new Error('microphone_track_missing');
+
+      mediaStream = new MediaStream([...videoTracks, ...audioTracks]);
       oldStream?.getVideoTracks().forEach((track) => track.stop());
-      if (!existingAudio) oldStream?.getAudioTracks().forEach((track) => track.stop());
+      if (!reuseAudio) oldStream?.getAudioTracks().forEach((track) => track.stop());
       facingMode = mode;
       cameraVideo.srcObject = mediaStream;
       cameraVideo.classList.toggle('mirrored', mode === 'user');
       await cameraVideo.play().catch(() => {});
     } catch (error) {
-      videoStream.getTracks().forEach((track) => track.stop());
-      throw { promptcamMessage: friendlyMediaError(error, 'microphone') };
+      requestedStream.getTracks().forEach((track) => {
+        if (!mediaStream?.getTracks().includes(track)) track.stop();
+      });
+      throw { promptcamMessage: friendlyMediaError(error, includeAudio ? 'media' : 'camera') };
     }
   }
 
