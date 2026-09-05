@@ -30,8 +30,6 @@
   };
   window.PromptCamTelegram = bridge;
 
-  // Signal Telegram as soon as the first deferred script runs. This keeps the
-  // native Mini App loading placeholder from waiting on optional AI modules.
   if (isTelegram) {
     try { tg.ready(); } catch (_) { /* Older clients may ignore this. */ }
   }
@@ -48,13 +46,19 @@
     const script = document.createElement('script');
     script.src = '/editor-tabs.js';
     script.dataset.promptcamEditorTabs = 'true';
+    script.addEventListener('error', () => {
+      document.documentElement.dataset.promptcamNativeMainButton = 'false';
+    }, { once: true });
     document.head.append(script);
   }
 
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', loadEditorShell, { once: true });
-  } else {
+  // Defer DOM restructuring until every regular `defer` script (including app.js)
+  // has finished initialization. A deferred script runs while readyState can already
+  // be `interactive`, so checking only for `loading` was too early in Telegram WebView.
+  if (document.readyState === 'complete') {
     loadEditorShell();
+  } else {
+    document.addEventListener('DOMContentLoaded', loadEditorShell, { once: true });
   }
 
   if (!isTelegram) return;
