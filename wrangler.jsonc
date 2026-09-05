@@ -4,6 +4,9 @@
   "main": "./worker/security-entry.js",
   "compatibility_date": "2026-09-03",
   "keep_vars": true,
+  "vars": {
+    "PROMPTCAM_ENV": "production"
+  },
   "assets": {
     "directory": "./web",
     "binding": "ASSETS",
