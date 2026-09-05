@@ -7,6 +7,8 @@ import {
 } from './ai-wallet.js';
 import { maybeHandleSafeTokenPayment } from './token-payment-safe.js';
 import { handleTestPackApi, maybeHandleTestTokenWebhook } from './token-test-pack.js';
+import { maybeHandlePaymentHub } from './bot-payment-hub.js';
+import { queueHubAfterSuccessfulPayment } from './bot-payment-hub-hooks.js';
 
 async function refreshWalletWebhook(request, env) {
   if (!env.TELEGRAM_BOT_TOKEN || !env.TELEGRAM_WEBHOOK_SECRET) return;
@@ -22,8 +24,13 @@ async function refreshWalletWebhook(request, env) {
       })
     });
   } catch (_) {
-    // The existing webhook remains usable; this refresh only expands allowed updates.
+    // Keep the current webhook if Telegram is temporarily unavailable.
   }
+}
+
+function finishWebhook(response, request, env, ctx) {
+  if (response?.ok) queueHubAfterSuccessfulPayment(request, env, ctx);
+  return response;
 }
 
 export default {
@@ -31,13 +38,22 @@ export default {
     const url = new URL(request.url);
 
     if (url.pathname === '/api/telegram/webhook' && request.method === 'POST') {
+      // Commands and the inline payment menu belong to one editable hub message.
+      // This must run before the legacy /tokens handler.
+      const hubResponse = await maybeHandlePaymentHub(request, env);
+      if (hubResponse) return hubResponse;
+
       const testTokenResponse = await maybeHandleTestTokenWebhook(request, env);
-      if (testTokenResponse) return testTokenResponse;
+      if (testTokenResponse) return finishWebhook(testTokenResponse, request, env, ctx);
+
       const safePaymentResponse = await maybeHandleSafeTokenPayment(request, env);
-      if (safePaymentResponse) return safePaymentResponse;
+      if (safePaymentResponse) return finishWebhook(safePaymentResponse, request, env, ctx);
+
       const tokenResponse = await maybeHandleTokenWebhook(request, env, ctx);
-      if (tokenResponse) return tokenResponse;
-      return app.fetch(request, env, ctx);
+      if (tokenResponse) return finishWebhook(tokenResponse, request, env, ctx);
+
+      const response = await app.fetch(request, env, ctx);
+      return finishWebhook(response, request, env, ctx);
     }
 
     if (url.pathname === '/api/ai/wallet-test') {
