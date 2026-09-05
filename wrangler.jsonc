@@ -7,6 +7,17 @@
   "vars": {
     "PROMPTCAM_ENV": "production"
   },
+  "secrets": {
+    "required": [
+      "TELEGRAM_BOT_TOKEN",
+      "TELEGRAM_WEBHOOK_SECRET",
+      "OPENAI_API_KEY"
+    ]
+  },
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1
+  },
   "assets": {
     "directory": "./web",
     "binding": "ASSETS",
