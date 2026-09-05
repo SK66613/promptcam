@@ -29,8 +29,8 @@ async function refreshWalletWebhook(request, env) {
   }
 }
 
-function finishWebhook(response, request, env, ctx) {
-  if (response?.ok) queueHubAfterSuccessfulPayment(request, env, ctx);
+function finishWebhook(response, paymentProbe, env, ctx) {
+  if (response?.ok && paymentProbe) queueHubAfterSuccessfulPayment(paymentProbe, env, ctx);
   return response;
 }
 
@@ -39,6 +39,9 @@ export default {
     const url = new URL(request.url);
 
     if (url.pathname === '/api/telegram/webhook' && request.method === 'POST') {
+      // Preserve one untouched clone before any downstream billing handler consumes body.
+      const paymentProbe = request.clone();
+
       // Commands and inline navigation belong to one editable payment hub message.
       // This must run before legacy /tokens callbacks and menu messages.
       const hubResponse = await maybeHandlePaymentHub(request, env);
@@ -47,22 +50,22 @@ export default {
       // Successful token payments are credited by silent idempotent handlers first,
       // then the existing hub message is refreshed in place.
       const safeTestPayment = await maybeHandleSafeTestTokenPayment(request, env);
-      if (safeTestPayment) return finishWebhook(safeTestPayment, request, env, ctx);
+      if (safeTestPayment) return finishWebhook(safeTestPayment, paymentProbe, env, ctx);
 
       const safePaymentResponse = await maybeHandleSafeTokenPayment(request, env);
-      if (safePaymentResponse) return finishWebhook(safePaymentResponse, request, env, ctx);
+      if (safePaymentResponse) return finishWebhook(safePaymentResponse, paymentProbe, env, ctx);
 
       // Legacy handlers remain for pre_checkout_query and old inline buttons that may
       // still exist in a user's chat from earlier PromptCam versions.
       const testTokenResponse = await maybeHandleTestTokenWebhook(request, env);
-      if (testTokenResponse) return finishWebhook(testTokenResponse, request, env, ctx);
+      if (testTokenResponse) return finishWebhook(testTokenResponse, paymentProbe, env, ctx);
 
       const tokenResponse = await maybeHandleTokenWebhook(request, env, ctx);
-      if (tokenResponse) return finishWebhook(tokenResponse, request, env, ctx);
+      if (tokenResponse) return finishWebhook(tokenResponse, paymentProbe, env, ctx);
 
       // PromptCam Pro billing remains the source of truth for entitlement/watermark.
       const response = await app.fetch(request, env, ctx);
-      return finishWebhook(response, request, env, ctx);
+      return finishWebhook(response, paymentProbe, env, ctx);
     }
 
     if (url.pathname === '/api/ai/wallet-test') {
