@@ -1,0 +1,310 @@
+.promptcam-legacy-camera-trigger[hidden] { display: none !important; }
+
+.editor-shell {
+  padding-bottom: calc(108px + var(--safe-bottom));
+}
+
+.promptcam-editor-hub {
+  position: fixed;
+  z-index: 42;
+  left: 50%;
+  bottom: max(10px, var(--safe-bottom));
+  width: min(354px, calc(100vw - 26px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)));
+  min-height: 64px;
+  display: grid;
+  grid-template-columns: auto auto auto;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px;
+  border: 1px solid rgba(255,255,255,.09);
+  border-radius: 28px;
+  background: rgba(8,8,14,.9);
+  box-shadow: 0 22px 65px rgba(0,0,0,.52), inset 0 1px 0 rgba(255,255,255,.045);
+  backdrop-filter: blur(24px) saturate(145%);
+  -webkit-backdrop-filter: blur(24px) saturate(145%);
+  transform: translateX(-50%);
+  transition: opacity .18s ease, transform .18s ease;
+}
+
+.promptcam-editor-hub[hidden] { display: none !important; }
+
+.promptcam-hub-button {
+  height: 50px;
+  width: 54px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  padding: 0 14px;
+  overflow: hidden;
+  border: 1px solid transparent;
+  border-radius: 22px;
+  background: transparent;
+  color: #8e8998;
+  font: inherit;
+  white-space: nowrap;
+  transition: width .24s cubic-bezier(.2,.75,.25,1), background .2s ease, border-color .2s ease, color .2s ease;
+}
+
+.promptcam-hub-button .hub-icon {
+  display: grid;
+  width: 25px;
+  height: 25px;
+  flex: 0 0 25px;
+  place-items: center;
+  font-size: 19px;
+}
+
+.promptcam-hub-button .hub-icon svg {
+  width: 23px;
+  height: 23px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+}
+
+.promptcam-hub-button .hub-label {
+  max-width: 0;
+  margin-left: 0;
+  overflow: hidden;
+  opacity: 0;
+  font-size: 13px;
+  font-weight: 760;
+  letter-spacing: -.01em;
+  transition: max-width .2s ease, margin-left .2s ease, opacity .15s ease;
+}
+
+.promptcam-hub-button.is-expanded {
+  width: 132px;
+  border-color: rgba(255,255,255,.12);
+  background: rgba(255,255,255,.075);
+  color: #f7f5fb;
+}
+
+.promptcam-hub-button.is-expanded .hub-label {
+  max-width: 82px;
+  margin-left: 8px;
+  opacity: 1;
+}
+
+.promptcam-hub-button[data-hub-action="camera"].is-expanded {
+  border-color: rgba(140,106,255,.34);
+  background: linear-gradient(145deg, rgba(112,78,238,.26), rgba(69,84,187,.18));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.06), 0 0 24px rgba(99,68,230,.12);
+}
+
+.promptcam-hub-button[data-hub-action="tokens"].is-expanded { color: #f0eaff; }
+.promptcam-hub-button[data-hub-action="tariff"].is-expanded { color: #fff0c5; }
+
+.promptcam-hub-button[data-hub-action="tokens"] .hub-token-count {
+  position: absolute;
+  min-width: 18px;
+  height: 18px;
+  display: grid;
+  place-items: center;
+  margin: -27px 0 0 24px;
+  padding: 0 4px;
+  border: 1px solid rgba(129,100,255,.35);
+  border-radius: 999px;
+  background: #11101c;
+  color: #cfc5f9;
+  font-size: 8px;
+  font-weight: 850;
+}
+
+.promptcam-hub-sheet {
+  position: fixed;
+  z-index: 41;
+  left: 50%;
+  bottom: calc(84px + max(10px, var(--safe-bottom)));
+  width: min(430px, calc(100vw - 24px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)));
+  max-height: min(66vh, 610px);
+  overflow: auto;
+  padding: 14px;
+  border: 1px solid rgba(255,255,255,.09);
+  border-radius: 22px;
+  background: linear-gradient(155deg, rgba(15,15,26,.98), rgba(8,9,16,.97));
+  box-shadow: 0 30px 80px rgba(0,0,0,.58), inset 0 1px 0 rgba(255,255,255,.04);
+  backdrop-filter: blur(26px) saturate(135%);
+  -webkit-backdrop-filter: blur(26px) saturate(135%);
+  transform: translate(-50%, 0);
+  animation: promptcamHubSheetIn .2s ease-out both;
+}
+
+.promptcam-hub-sheet[hidden] { display: none !important; }
+
+.promptcam-hub-sheet-head {
+  position: sticky;
+  z-index: 2;
+  top: -14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: -14px -14px 12px;
+  padding: 14px;
+  border-bottom: 1px solid rgba(255,255,255,.055);
+  background: rgba(12,12,21,.94);
+  backdrop-filter: blur(22px);
+  -webkit-backdrop-filter: blur(22px);
+}
+
+.promptcam-hub-sheet-title { display: grid; gap: 2px; }
+.promptcam-hub-sheet-title strong { color: #f6f3fc; font-size: 15px; }
+.promptcam-hub-sheet-title small { color: #858091; font-size: 10px; line-height: 1.35; }
+.promptcam-hub-sheet-close {
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: 12px;
+  background: rgba(255,255,255,.055);
+  color: #aaa5b5;
+  font-size: 21px;
+}
+
+#promptcamTokenHubContent .ai-wallet-card {
+  margin: 0;
+  border: 0;
+  padding: 2px 0 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+#promptcamTokenHubContent .ai-wallet-actions { margin-top: 12px; }
+#promptcamTokenHubContent .ai-wallet-shop { grid-template-columns: 1fr; }
+#promptcamTokenHubContent .ai-wallet-pack[data-test="true"] { grid-column: auto; }
+
+.promptcam-tariff-current {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid rgba(255,255,255,.075);
+  border-radius: 15px;
+  background: rgba(255,255,255,.03);
+}
+.promptcam-tariff-current span { display: grid; gap: 3px; }
+.promptcam-tariff-current strong { color: #f2eef9; font-size: 13px; }
+.promptcam-tariff-current small { color: #817b8c; font-size: 10px; line-height: 1.35; }
+.promptcam-tariff-current b {
+  padding: 6px 9px;
+  border-radius: 999px;
+  background: rgba(255,255,255,.055);
+  color: #a39cae;
+  font-size: 9px;
+}
+.promptcam-tariff-current[data-pro="true"] b { background: rgba(111,212,154,.1); color: #91deb0; }
+
+.promptcam-tariff-plans { display: grid; gap: 8px; margin-top: 10px; }
+.promptcam-tariff-plan {
+  min-height: 58px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 12px;
+  border: 1px solid rgba(255,255,255,.075);
+  border-radius: 14px;
+  background: rgba(255,255,255,.028);
+  color: #eeeaf6;
+  text-align: left;
+}
+.promptcam-tariff-plan span { display: grid; gap: 3px; }
+.promptcam-tariff-plan strong { font-size: 12px; }
+.promptcam-tariff-plan small { color: #7e7888; font-size: 9.5px; }
+.promptcam-tariff-plan b { color: #ffe7a3; font-size: 12px; white-space: nowrap; }
+.promptcam-tariff-plan:disabled { opacity: .52; }
+.promptcam-tariff-status { min-height: 18px; margin: 9px 2px 0; color: #817b8d; font-size: 10px; line-height: 1.4; }
+.promptcam-tariff-status[data-tone="success"] { color: #8ddbaa; }
+.promptcam-tariff-status[data-tone="error"] { color: #f095a4; }
+
+.promptcam-ai-setup-card {
+  display: grid;
+  gap: 12px;
+  padding: 15px;
+  border: 1px solid rgba(146,116,255,.18);
+  border-radius: 19px;
+  background: linear-gradient(160deg, rgba(27,23,43,.94), rgba(13,14,25,.94));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.035);
+}
+.promptcam-ai-setup-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.promptcam-ai-setup-title { display: grid; gap: 3px; }
+.promptcam-ai-setup-title strong { color: #f5f1ff; font-size: 16px; }
+.promptcam-ai-setup-title small { color: #8f899d; font-size: 11px; line-height: 1.35; }
+.promptcam-ai-setup-state { padding: 6px 9px; border-radius: 999px; background: rgba(255,255,255,.055); color: #9a94a5; font-size: 9px; font-weight: 850; }
+.promptcam-ai-setup-state[data-on="true"] { background: rgba(107,78,229,.17); color: #d9ccff; }
+.promptcam-ai-setup-section { display: grid; gap: 7px; }
+.promptcam-ai-setup-label { color: #817a8d; font-size: 9px; font-weight: 850; letter-spacing: .08em; }
+.promptcam-ai-setup-toggle {
+  min-height: 54px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 12px;
+  border: 1px solid rgba(255,255,255,.09);
+  border-radius: 14px;
+  background: rgba(255,255,255,.035);
+  color: #f1edf7;
+  text-align: left;
+}
+.promptcam-ai-setup-toggle span { display: grid; gap: 3px; }
+.promptcam-ai-setup-toggle strong { font-size: 12px; }
+.promptcam-ai-setup-toggle small { color: #898394; font-size: 10px; line-height: 1.3; }
+.promptcam-ai-setup-toggle b { min-width: 44px; padding: 6px 8px; border-radius: 999px; background: rgba(255,255,255,.07); color: #8e8899; font-size: 9px; text-align: center; }
+.promptcam-ai-setup-toggle[aria-pressed="true"] { border-color: rgba(136,103,255,.38); background: rgba(105,74,229,.11); }
+.promptcam-ai-setup-toggle[aria-pressed="true"] b { background: linear-gradient(145deg,#7f59ff,#4a72ff); color: #fff; }
+.promptcam-ai-setup-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+.promptcam-ai-option {
+  min-height: 42px;
+  padding: 8px 9px;
+  border: 1px solid rgba(255,255,255,.075);
+  border-radius: 12px;
+  background: rgba(255,255,255,.03);
+  color: #aaa4b5;
+  font-size: 10.5px;
+  font-weight: 720;
+  text-align: left;
+}
+.promptcam-ai-option.is-selected { border-color: rgba(140,105,255,.36); background: rgba(109,76,232,.12); color: #f0ebff; }
+.promptcam-ai-option:disabled { opacity: .42; }
+.promptcam-ai-setup-status { min-height: 18px; margin: 0; color: #8b8497; font-size: 10px; line-height: 1.4; }
+.promptcam-ai-setup-status[data-tone="success"] { color: #8edbae; }
+
+/* The AI rail button uses one indicator: token count. Active state is the button glow itself. */
+.camera-tool-button.live-ai-tool.is-active::after,
+.live-ai-tool[data-ai-tokens]::after {
+  content: '⚡' attr(data-ai-tokens) !important;
+  position: absolute !important;
+  top: -6px !important;
+  right: -7px !important;
+  width: auto !important;
+  min-width: 28px !important;
+  height: 18px !important;
+  display: grid !important;
+  place-items: center !important;
+  padding: 0 5px !important;
+  border: 1px solid rgba(122,94,255,.4) !important;
+  border-radius: 999px !important;
+  background: rgba(10,9,19,.96) !important;
+  color: #ddd4ff !important;
+  font-size: 7.5px !important;
+  font-weight: 900 !important;
+  line-height: 1 !important;
+  box-shadow: 0 4px 12px rgba(0,0,0,.35) !important;
+}
+.live-ai-tool[data-token-state="low"]::after { color: #ffd17d !important; border-color: rgba(255,190,65,.45) !important; }
+.live-ai-tool[data-token-state="empty"]::after { color: #ff8ea0 !important; border-color: rgba(255,86,112,.46) !important; }
+
+@keyframes promptcamHubSheetIn {
+  from { opacity: 0; transform: translate(-50%, 9px) scale(.985); }
+  to { opacity: 1; transform: translate(-50%, 0) scale(1); }
+}
+
+@media (max-width: 390px) {
+  .promptcam-editor-hub { width: calc(100vw - 22px); }
+  .promptcam-hub-button.is-expanded { width: 122px; }
+  .promptcam-ai-setup-grid { grid-template-columns: 1fr 1fr; }
+}
