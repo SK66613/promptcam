@@ -3,6 +3,8 @@ import { handleLegalApi, hasCurrentConsent, requireMiniAppConsent } from './lega
 import { maybeHandleLegalWebhook, refreshLaunchPaymentHub } from './bot-legal.js';
 import { handleLaunchBillingInvoice, LAUNCH_PLANS, maybeHandleLaunchBillingWebhook } from './pro-billing-launch.js';
 import { maybeEnsureWalletForWebhook } from './launch-wallet.js';
+import { consumePurchaseRate, maybeRateLimitPurchaseWebhook, purchaseRateResponse } from './purchase-rate.js';
+import { handleSubscriptionApi, recordRecurringPayment } from './subscription-control.js';
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -64,8 +66,6 @@ async function maybeBlockTestWebhook(request, env) {
     return json({ ok: true });
   }
 
-  // If Telegram already charged an old test invoice, let the existing idempotent
-  // successful_payment handler deliver the purchased tokens.
   return null;
 }
 
@@ -99,16 +99,32 @@ async function patchBillingMe(request, env, ctx) {
   return json(data, response.status);
 }
 
-function queueLaunchProHubRefresh(update, env, ctx) {
+function queueLaunchProPostPayment(update, env, ctx) {
   const payment = update?.message?.successful_payment;
   const telegramId = String(update?.message?.from?.id || '');
   if (!payment || !telegramId || !String(payment.invoice_payload || '').startsWith('pc:')) return;
-  const work = refreshLaunchPaymentHub(env, telegramId, {
-    view: 'pro',
-    notice: '✅ Оплата PromptCam Pro прошла. Тариф и доступ обновлены.',
-    chatId: telegramId
-  }).catch(() => false);
+
+  const work = (async () => {
+    if (payment.is_first_recurring || payment.is_recurring) {
+      await recordRecurringPayment(
+        env,
+        telegramId,
+        String(payment.telegram_payment_charge_id || ''),
+        Boolean(payment.is_first_recurring)
+      );
+    }
+    await refreshLaunchPaymentHub(env, telegramId, {
+      view: 'pro',
+      notice: '✅ Оплата PromptCam Pro прошла. Тариф и доступ обновлены.',
+      chatId: telegramId
+    });
+  })().catch(() => false);
   if (ctx && typeof ctx.waitUntil === 'function') ctx.waitUntil(work);
+}
+
+async function purchaseRateOrResponse(env, telegramId) {
+  const rate = await consumePurchaseRate(env, telegramId);
+  return rate.ok ? null : purchaseRateResponse(rate.retryAfter);
 }
 
 export default {
@@ -119,15 +135,22 @@ export default {
       return handleLegalApi(request, env, ctx, app);
     }
 
+    if (url.pathname === '/api/billing/subscription') {
+      return handleSubscriptionApi(request, env, ctx, app);
+    }
+
     if (url.pathname === '/api/telegram/webhook' && request.method === 'POST') {
       const paymentProbe = request.clone();
       await maybeEnsureWalletForWebhook(request, env);
 
-      const legalResponse = await maybeHandleLegalWebhook(request, env);
-      if (legalResponse) return legalResponse;
-
       const testBlock = await maybeBlockTestWebhook(request, env);
       if (testBlock) return testBlock;
+
+      const purchaseRate = await maybeRateLimitPurchaseWebhook(request, env);
+      if (purchaseRate) return purchaseRate;
+
+      const legalResponse = await maybeHandleLegalWebhook(request, env);
+      if (legalResponse) return legalResponse;
 
       const consentBlock = await maybeBlockUnconsentedCheckout(request, env);
       if (consentBlock) return consentBlock;
@@ -135,7 +158,7 @@ export default {
       const billingResponse = await maybeHandleLaunchBillingWebhook(request, env);
       if (billingResponse) {
         const update = await paymentProbe.json().catch(() => null);
-        queueLaunchProHubRefresh(update, env, ctx);
+        queueLaunchProPostPayment(update, env, ctx);
         return billingResponse;
       }
 
@@ -155,6 +178,8 @@ export default {
       if (!body) return json({ ok: false, error: 'invalid_json' }, 400);
       const consent = await requireMiniAppConsent(request, env, ctx, app, body);
       if (!consent.ok) return consent.response;
+      const rateResponse = await purchaseRateOrResponse(env, consent.user.id);
+      if (rateResponse) return rateResponse;
       return handleLaunchBillingInvoice(request, env, consent.user, body);
     }
 
@@ -163,6 +188,8 @@ export default {
       if (body?.action === 'buy_pack') {
         const consent = await requireMiniAppConsent(request, env, ctx, app, body);
         if (!consent.ok) return consent.response;
+        const rateResponse = await purchaseRateOrResponse(env, consent.user.id);
+        if (rateResponse) return rateResponse;
       }
     }
 
