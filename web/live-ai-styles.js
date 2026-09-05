@@ -138,22 +138,19 @@
     render();
   });
 
-  function ensureScriptAiStyles() {
-    if (document.querySelector('link[data-promptcam-script-ai]')) return;
+  function ensureStyleLink(href, attribute) {
+    if (document.querySelector(`link[${attribute}]`)) return;
     const link = document.createElement('link');
     link.rel = 'stylesheet';
-    link.href = '/script-ai.css';
-    link.dataset.promptcamScriptAi = 'true';
+    link.href = href;
+    link.setAttribute(attribute, 'true');
     document.head.append(link);
   }
 
-  function ensureCreatorLibraryStyles() {
-    if (document.querySelector('link[data-promptcam-creator-library]')) return;
-    const link = document.createElement('link');
-    link.rel = 'stylesheet';
-    link.href = '/creator-library.css';
-    link.dataset.promptcamCreatorLibrary = 'true';
-    document.head.append(link);
+  function ensureCreatorStyles() {
+    ensureStyleLink('/script-ai.css', 'data-promptcam-script-ai');
+    ensureStyleLink('/creator-library.css', 'data-promptcam-creator-library');
+    ensureStyleLink('/creator-library-v37.css?v=37', 'data-promptcam-creator-library-v37');
   }
 
   function loadScriptOnce(src, attribute) {
@@ -180,11 +177,10 @@
   }
 
   async function loadCreatorModules() {
-    ensureScriptAiStyles();
-    ensureCreatorLibraryStyles();
+    ensureCreatorStyles();
     try {
       await loadScriptOnce('/script-ai.js', 'data-promptcam-script-ai');
-      await loadScriptOnce('/creator-library-safe.js?v=36', 'data-promptcam-creator-library');
+      await loadScriptOnce('/creator-library-v37.js?v=37', 'data-promptcam-creator-library');
       await loadScriptOnce('/take-director-beats.js', 'data-promptcam-take-beats');
       await loadScriptOnce('/take-director.js', 'data-promptcam-take-director');
       window.dispatchEvent(new CustomEvent('promptcam:creator-modules-ready'));
