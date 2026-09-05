@@ -1,6 +1,7 @@
 import app from './speech-entry.js';
 import { maybeHandleTakeDirector } from './take-director.js';
 import { handleScriptAi } from './script-ai.js';
+import { handleCreatorLibrary } from './creator-library.js';
 
 const SPEECH_CONTEXT_MODES = new Set(['crew', 'acting']);
 const SPEECH_CONTEXT_MAX_CHARS = 520;
@@ -95,6 +96,11 @@ function methodNotAllowed() {
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
+
+    if (url.pathname === '/api/library') {
+      if (request.method !== 'POST') return methodNotAllowed();
+      return handleCreatorLibrary(request, env, ctx);
+    }
 
     if (url.pathname === '/api/ai/script') {
       if (request.method !== 'POST') return methodNotAllowed();
