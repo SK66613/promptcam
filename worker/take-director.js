@@ -37,6 +37,11 @@ function compactText(value, maxLength) {
   return value.replace(/\s+/g, ' ').trim().slice(0, maxLength);
 }
 
+function sliceText(value, maxLength) {
+  if (typeof value !== 'string') return '';
+  return value.trim().slice(0, maxLength);
+}
+
 function requestTooLarge(request) {
   const raw = request.headers.get('Content-Length');
   if (!raw) return false;
@@ -52,7 +57,7 @@ function normalizeTakeBody(body) {
   const source = body.takeDirector;
   const reason = TAKE_ALLOWED_REASONS.has(source.reason) ? source.reason : 'manual';
   const speechText = compactText(source.speechText, TAKE_SPEECH_MAX_CHARS);
-  const scriptWindow = compactText(source.scriptWindow, TAKE_SCRIPT_MAX_CHARS);
+  const scriptWindow = sliceText(source.scriptWindow, TAKE_SCRIPT_MAX_CHARS);
   if (!speechText || !scriptWindow) return { error: 'take_context_missing' };
   const speechSpanMs = Math.max(0, Math.min(35_000, Math.round(Number(source.speechSpanMs || 0))));
   const windowStart = Math.max(0, Math.round(Number(source.windowStart || 0)));
@@ -155,7 +160,7 @@ function normalizeResult(value, scriptWindow) {
   const status = statuses.has(value.status) ? value.status : '';
   const confidence = ['high', 'medium', 'low'].includes(value.confidence) ? value.confidence : 'low';
   const text = compactText(value.text, 180);
-  const anchor = compactText(value.anchor, 220);
+  const anchor = sliceText(value.anchor, 220);
   if (!action || !status) return null;
   if (action === 'none') return { action: 'none', status: 'on_track', text: '', anchor: '', confidence };
   if (!text || !anchor || !scriptWindow.includes(anchor)) {
