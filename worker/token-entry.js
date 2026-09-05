@@ -10,6 +10,7 @@ import { maybeHandleSafeTestTokenPayment } from './token-test-payment-safe.js';
 import { handleTestPackApi, maybeHandleTestTokenWebhook } from './token-test-pack.js';
 import { maybeHandlePaymentHub } from './bot-payment-hub.js';
 import { queueHubAfterSuccessfulPayment } from './bot-payment-hub-hooks.js';
+import { ensureBotUserFromWebhook } from './bot-user-bootstrap.js';
 
 async function refreshWalletWebhook(request, env) {
   if (!env.TELEGRAM_BOT_TOKEN || !env.TELEGRAM_WEBHOOK_SECRET) return;
@@ -41,6 +42,10 @@ export default {
     if (url.pathname === '/api/telegram/webhook' && request.method === 'POST') {
       // Preserve one untouched clone before any downstream billing handler consumes body.
       const paymentProbe = request.clone();
+
+      // Keep billing FK/user metadata valid even when the user opens the shop from bot
+      // before ever opening the Mini App.
+      await ensureBotUserFromWebhook(request, env);
 
       // Commands and inline navigation belong to one editable payment hub message.
       // This must run before legacy /tokens callbacks and menu messages.
