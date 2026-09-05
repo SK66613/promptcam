@@ -110,9 +110,6 @@
     document.head.append(script);
   }
 
-  // Defer DOM restructuring until every regular `defer` script (including app.js)
-  // has finished initialization. A deferred script runs while readyState can already
-  // be `interactive`, so checking only for `loading` was too early in Telegram WebView.
   if (document.readyState === 'complete') {
     loadEditorShell();
   } else {
@@ -137,12 +134,17 @@
     try { return callback(); } catch (_) { return undefined; }
   };
 
+  function lockTelegramVerticalSwipes() {
+    if (typeof tg.disableVerticalSwipes === 'function') safe(() => tg.disableVerticalSwipes());
+  }
+
   function enforceFullscreenPolicy() {
     if (isMobileTelegram) {
       safe(() => tg.expand());
       if (typeof tg.requestFullscreen === 'function' && !tg.isFullscreen) {
         safe(() => tg.requestFullscreen());
       }
+      lockTelegramVerticalSwipes();
       return;
     }
 
@@ -152,6 +154,7 @@
   }
 
   enforceFullscreenPolicy();
+  lockTelegramVerticalSwipes();
   safe(() => tg.setHeaderColor('#09090d'));
   safe(() => tg.setBackgroundColor('#09090d'));
   if (typeof tg.setBottomBarColor === 'function') safe(() => tg.setBottomBarColor('#09090d'));
@@ -167,11 +170,9 @@
     if (insideFlow) safe(() => tg.BackButton.show());
     else safe(() => tg.BackButton.hide());
 
-    if (cameraIsOpen() && typeof tg.disableVerticalSwipes === 'function') {
-      safe(() => tg.disableVerticalSwipes());
-    } else if (typeof tg.enableVerticalSwipes === 'function') {
-      safe(() => tg.enableVerticalSwipes());
-    }
+    // PromptCam owns vertical scrolling inside the WebView. Keep Telegram's swipe-to-collapse
+    // gesture disabled on editor, camera, dialogs and sheets so the Mini App does not jump away.
+    lockTelegramVerticalSwipes();
   }
 
   function handleTelegramBack() {
@@ -237,8 +238,14 @@
     safe(() => tg.onEvent('viewportChanged', syncTelegramChrome));
     safe(() => tg.onEvent('safeAreaChanged', syncTelegramChrome));
     safe(() => tg.onEvent('contentSafeAreaChanged', syncTelegramChrome));
-    safe(() => tg.onEvent('fullscreenChanged', enforceFullscreenPolicy));
-    safe(() => tg.onEvent('activated', enforceFullscreenPolicy));
+    safe(() => tg.onEvent('fullscreenChanged', () => {
+      enforceFullscreenPolicy();
+      syncTelegramChrome();
+    }));
+    safe(() => tg.onEvent('activated', () => {
+      enforceFullscreenPolicy();
+      syncTelegramChrome();
+    }));
     safe(() => tg.onEvent('themeChanged', () => {
       safe(() => tg.setHeaderColor('#09090d'));
       safe(() => tg.setBackgroundColor('#09090d'));
