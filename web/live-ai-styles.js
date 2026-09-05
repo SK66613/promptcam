@@ -138,7 +138,16 @@
     render();
   });
 
+  function loadTakeDirector() {
+    if (document.querySelector('script[data-promptcam-take-director]')) return;
+    const script = document.createElement('script');
+    script.src = '/take-director.js';
+    script.dataset.promptcamTakeDirector = 'true';
+    document.head.append(script);
+  }
+
   ensureControls();
+  loadTakeDirector();
 
   window.PromptCamLiveAIStyles = Object.freeze({
     getStyle: () => selectedStyle,

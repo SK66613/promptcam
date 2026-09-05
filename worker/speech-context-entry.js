@@ -1,4 +1,5 @@
 import app from './speech-entry.js';
+import { maybeHandleTakeDirector } from './take-director.js';
 
 const SPEECH_CONTEXT_MODES = new Set(['crew', 'acting']);
 const SPEECH_CONTEXT_MAX_CHARS = 520;
@@ -83,6 +84,8 @@ export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
     if (url.pathname === '/api/ai/live' && request.method === 'POST') {
+      const takeResponse = await maybeHandleTakeDirector(request, env, ctx);
+      if (takeResponse) return takeResponse;
       const rewritten = await rewriteLiveAiRequest(request);
       const response = await app.fetch(rewritten.request, env, ctx);
       return withSpeechDebugHeader(response, rewritten.speech);
