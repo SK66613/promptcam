@@ -30,14 +30,10 @@
     const detail = normalize(row.querySelector('.creator-favorite-detail')?.textContent);
 
     if (ALWAYS_PRODUCTION_KIND.some((term) => kind.includes(term))) return true;
-
-    // Director notes are mixed: some are useful spoken hooks, some are pure filming actions.
-    // Hide the script action only when the text is clearly about camera/performance mechanics.
     if (kind.includes('режисс')) {
       const combined = `${text} ${detail}`;
       return PRODUCTION_TEXT_HINTS.some((term) => combined.includes(term));
     }
-
     return false;
   }
 
@@ -78,4 +74,11 @@
   window.addEventListener('promptcam:creator-library-ready', schedule);
   window.addEventListener('pagehide', () => observer.disconnect(), { once: true });
   schedule();
+
+  if (!document.querySelector('script[data-promptcam-library-swipe-v43]')) {
+    const script = document.createElement('script');
+    script.src = '/library-swipe-v43.js?v=43';
+    script.dataset.promptcamLibrarySwipeV43 = 'true';
+    document.head.append(script);
+  }
 })();
