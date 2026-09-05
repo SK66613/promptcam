@@ -1,0 +1,269 @@
+/* PromptCam v45 mobile polish */
+html.promptcam-ui-v45,
+html.promptcam-ui-v45 body {
+  max-width: 100%;
+  overflow-x: clip;
+  overscroll-behavior-x: none;
+}
+html.promptcam-ui-v45 body { touch-action: pan-y pinch-zoom; }
+html.promptcam-ui-v45 .screen,
+html.promptcam-ui-v45 .editor-shell { max-width: 100%; overflow-x: clip; }
+html.promptcam-ui-v45 input[type="range"] { touch-action: pan-x; }
+
+/* Main editor navigation: readable labels with horizontal scroll instead of tiny 4-column text. */
+html.promptcam-ui-v45 .editor-tabs {
+  display: flex !important;
+  grid-template-columns: none !important;
+  gap: 7px !important;
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+  padding: 5px !important;
+  scroll-snap-type: x proximity;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-x;
+}
+html.promptcam-ui-v45 .editor-tabs::-webkit-scrollbar { display: none; }
+html.promptcam-ui-v45 .editor-tab {
+  flex: 0 0 auto;
+  min-width: 112px !important;
+  min-height: 42px !important;
+  padding: 8px 14px !important;
+  border-radius: 12px !important;
+  scroll-snap-align: center;
+  font-size: 12.5px !important;
+  font-weight: 780 !important;
+  letter-spacing: -.015em;
+}
+html.promptcam-ui-v45 .editor-tab.is-selected {
+  background: linear-gradient(145deg, rgba(255,255,255,.11), rgba(123,89,245,.11)) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.075), 0 5px 18px rgba(0,0,0,.16) !important;
+}
+
+/* Never leave the temporary AI loader above an already mounted AI setup card. */
+html.promptcam-ui-v45 .editor-tab-panel[data-editor-panel="ai"]:has(.promptcam-ai-setup-card) > .editor-tab-placeholder {
+  display: none !important;
+}
+
+/* Consistent line-icon system. */
+.pc-icon-v45 {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.pc-icon-v45.pc-icon-sm { width: 17px; height: 17px; }
+.pc-icon-v45.pc-icon-lg { width: 23px; height: 23px; }
+
+/* Bottom action hub. Keep token count physically attached to its icon. */
+html.promptcam-ui-v45 .promptcam-editor-hub {
+  z-index: 48 !important;
+  border-color: rgba(255,255,255,.12) !important;
+  background: rgba(7,7,13,.94) !important;
+  box-shadow: 0 24px 72px rgba(0,0,0,.62), inset 0 1px 0 rgba(255,255,255,.055) !important;
+}
+html.promptcam-ui-v45 .promptcam-hub-button { position: relative; }
+html.promptcam-ui-v45 .promptcam-hub-button .hub-icon {
+  position: relative;
+  overflow: visible;
+  color: currentColor;
+}
+html.promptcam-ui-v45 .promptcam-hub-button .hub-icon .pc-icon-v45 { width: 22px; height: 22px; }
+html.promptcam-ui-v45 .promptcam-hub-button[data-hub-action="tokens"] .hub-token-count {
+  position: absolute !important;
+  z-index: 3;
+  top: -7px !important;
+  right: -9px !important;
+  left: auto !important;
+  margin: 0 !important;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border: 1px solid rgba(139,108,255,.45);
+  border-radius: 999px;
+  background: #121020;
+  color: #d8ceff;
+  font-size: 8px;
+  font-weight: 900;
+  line-height: 18px;
+  text-align: center;
+  pointer-events: none;
+}
+html.promptcam-ui-v45 .promptcam-hub-button.is-expanded .hub-icon {
+  transform: none !important;
+}
+
+/* Separate sheets from the page with a real backdrop and stronger surface. */
+.promptcam-hub-backdrop-v45 {
+  position: fixed;
+  z-index: 44;
+  inset: 0;
+  border: 0;
+  padding: 0;
+  background: rgba(3,3,8,.58);
+  backdrop-filter: blur(5px) saturate(90%);
+  -webkit-backdrop-filter: blur(5px) saturate(90%);
+  animation: pcBackdropIn .16s ease-out both;
+  touch-action: none;
+}
+.promptcam-hub-backdrop-v45[hidden] { display: none !important; }
+html.promptcam-ui-v45 .promptcam-hub-sheet {
+  z-index: 46 !important;
+  border: 1px solid rgba(157,125,255,.24) !important;
+  outline: 1px solid rgba(255,255,255,.025);
+  background: linear-gradient(155deg, rgba(20,18,34,.995), rgba(8,9,17,.995)) !important;
+  box-shadow: 0 34px 100px rgba(0,0,0,.78), 0 0 0 1px rgba(103,72,229,.05), inset 0 1px 0 rgba(255,255,255,.065) !important;
+  overscroll-behavior: contain;
+}
+html.promptcam-ui-v45 .promptcam-hub-sheet::after {
+  content: '';
+  position: absolute;
+  top: 6px;
+  left: 50%;
+  width: 38px;
+  height: 3px;
+  border-radius: 999px;
+  background: rgba(255,255,255,.18);
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+html.promptcam-ui-v45 .promptcam-hub-sheet-head {
+  border-bottom-color: rgba(163,134,255,.11) !important;
+  background: rgba(15,13,26,.97) !important;
+}
+
+/* AI setup: better hierarchy and consistent icons. */
+html.promptcam-ui-v45 .promptcam-ai-setup-title {
+  grid-template-columns: 28px minmax(0,1fr);
+  column-gap: 9px;
+  align-items: center;
+}
+html.promptcam-ui-v45 .promptcam-ai-setup-title > .pc-icon-v45 {
+  grid-row: 1 / 3;
+  width: 24px;
+  height: 24px;
+  color: #a991ff;
+}
+html.promptcam-ui-v45 .promptcam-ai-setup-title strong,
+html.promptcam-ui-v45 .promptcam-ai-setup-title small { grid-column: 2; }
+html.promptcam-ui-v45 .promptcam-ai-setup-toggle > span {
+  display: grid !important;
+  grid-template-columns: 22px minmax(0,1fr);
+  column-gap: 8px;
+  align-items: center;
+}
+html.promptcam-ui-v45 .promptcam-ai-setup-toggle > span > .pc-icon-v45 {
+  grid-row: 1 / 3;
+  color: #a993ff;
+}
+html.promptcam-ui-v45 .promptcam-ai-setup-toggle > span > strong,
+html.promptcam-ui-v45 .promptcam-ai-setup-toggle > span > small { grid-column: 2; }
+html.promptcam-ui-v45 .promptcam-ai-option.pc-iconized-v45 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+}
+html.promptcam-ui-v45 .promptcam-ai-option.pc-iconized-v45 .pc-icon-v45 { color: #928aa3; }
+html.promptcam-ui-v45 .promptcam-ai-option.pc-iconized-v45.is-selected .pc-icon-v45 { color: #b9a7ff; }
+
+/* The v42 token badge is the only AI rail state marker; old green dot stays gone. */
+html.promptcam-ui-v45 .live-ai-active-dot { display: none !important; }
+
+/* Library: inline contextual AI explanation instead of rewriting the scenario. */
+html.promptcam-ui-v45 .creator-smart-preview { display: none !important; }
+html.promptcam-ui-v45 .creator-favorite-row-personal .creator-row-actions,
+html.promptcam-ui-v45 .creator-template-row-personal .creator-row-actions,
+html.promptcam-ui-v45 .promptcam-swipe-shell .creator-row-actions {
+  display: flex !important;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 7px;
+  grid-template-columns: none !important;
+  margin-top: 9px;
+}
+html.promptcam-ui-v45 .promptcam-swipe-shell .creator-row-actions .primary,
+html.promptcam-ui-v45 .creator-template-row-personal .creator-row-actions .primary {
+  width: auto !important;
+}
+html.promptcam-ui-v45 .creator-template-apply-v45,
+html.promptcam-ui-v45 .creator-explain-v45 {
+  width: auto !important;
+  min-width: 0 !important;
+  min-height: 34px !important;
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 11px !important;
+  border: 1px solid rgba(137,102,255,.28) !important;
+  border-radius: 10px !important;
+  background: rgba(102,72,224,.1) !important;
+  color: #e9e1ff !important;
+  font-size: 10.5px !important;
+  font-weight: 780 !important;
+}
+html.promptcam-ui-v45 .creator-explain-v45 { color: #d8ceff !important; }
+html.promptcam-ui-v45 .creator-explain-v45:disabled { opacity: .55; }
+
+.creator-explanation-v45 {
+  display: grid;
+  gap: 7px;
+  margin: 9px 0 1px;
+  padding: 10px 11px;
+  border: 1px solid rgba(137,103,255,.18);
+  border-radius: 12px;
+  background: linear-gradient(145deg, rgba(116,80,241,.075), rgba(255,255,255,.025));
+  color: #bcb5c8;
+}
+.creator-explanation-v45[hidden] { display: none !important; }
+.creator-explanation-head-v45 {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: #cbbcff;
+  font-size: 10px;
+  font-weight: 850;
+  letter-spacing: .02em;
+}
+.creator-explanation-v45 p {
+  margin: 0;
+  color: #b5afbf;
+  font-size: 11.5px;
+  line-height: 1.48;
+}
+.creator-explanation-v45 p b { color: #ede8f7; font-weight: 760; }
+.creator-explanation-v45[data-tone="error"] { border-color: rgba(237,101,126,.22); }
+.creator-explanation-v45[data-tone="error"] p { color: #e2a0ad; }
+
+/* Compact template/library structural icons. */
+html.promptcam-ui-v45 .creator-library-icon {
+  font-size: 0 !important;
+  color: #b4a2ff;
+}
+html.promptcam-ui-v45 .creator-library-icon .pc-icon-v45 { width: 20px; height: 20px; }
+html.promptcam-ui-v45 .creator-library-save.pc-iconized-v45 {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Swipe surface: no horizontal page rubber-band, vertical list scrolling stays native. */
+html.promptcam-ui-v45 .promptcam-swipe-shell,
+html.promptcam-ui-v45 .promptcam-swipe-shell > .creator-template-row-personal,
+html.promptcam-ui-v45 .promptcam-swipe-shell > .creator-favorite-row-personal {
+  max-width: 100%;
+  touch-action: pan-y;
+  overscroll-behavior-x: none;
+}
+
+@keyframes pcBackdropIn { from { opacity: 0; } to { opacity: 1; } }
+
+@media (max-width: 390px) {
+  html.promptcam-ui-v45 .editor-tab { min-width: 106px !important; font-size: 12px !important; }
+  html.promptcam-ui-v45 .promptcam-hub-button.is-expanded { width: 124px !important; }
+}
