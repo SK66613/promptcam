@@ -39,3 +39,35 @@ export function purchaseRateResponse(retryAfter = 60) {
     }
   });
 }
+
+async function answerCallback(env, queryId, text) {
+  if (!env.TELEGRAM_BOT_TOKEN || !queryId) return;
+  try {
+    await fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/answerCallbackQuery`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ callback_query_id: queryId, text })
+    });
+  } catch (_) { /* rate limiting does not depend on notification delivery */ }
+}
+
+export async function maybeRateLimitPurchaseWebhook(request, env) {
+  if (request.method !== 'POST' || !env.TELEGRAM_WEBHOOK_SECRET) return null;
+  const provided = request.headers.get('X-Telegram-Bot-Api-Secret-Token') || '';
+  if (provided !== env.TELEGRAM_WEBHOOK_SECRET) return null;
+  let update;
+  try { update = await request.clone().json(); }
+  catch (_) { return null; }
+  const query = update?.callback_query;
+  const data = String(query?.data || '');
+  if (!query || !(data.startsWith('pch:token:') || data.startsWith('pch:pro:') || data.startsWith('ait:buy:'))) return null;
+  const telegramId = String(query.from?.id || '');
+  if (!telegramId) return null;
+  const rate = await consumePurchaseRate(env, telegramId);
+  if (rate.ok) return null;
+  await answerCallback(env, query.id, `Слишком много счетов. Попробуй через ${Math.max(1, rate.retryAfter)} с.`);
+  return new Response(JSON.stringify({ ok: true, rateLimited: true }), {
+    status: 200,
+    headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' }
+  });
+}
