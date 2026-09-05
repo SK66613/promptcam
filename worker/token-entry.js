@@ -5,6 +5,7 @@ import {
   maybeHandleTokenWebhook,
   meterAiRequest
 } from './ai-wallet.js';
+import { maybeHandleSafeTokenPayment } from './token-payment-safe.js';
 
 async function refreshWalletWebhook(request, env) {
   if (!env.TELEGRAM_BOT_TOKEN || !env.TELEGRAM_WEBHOOK_SECRET) return;
@@ -29,6 +30,8 @@ export default {
     const url = new URL(request.url);
 
     if (url.pathname === '/api/telegram/webhook' && request.method === 'POST') {
+      const safePaymentResponse = await maybeHandleSafeTokenPayment(request, env);
+      if (safePaymentResponse) return safePaymentResponse;
       const tokenResponse = await maybeHandleTokenWebhook(request, env, ctx);
       if (tokenResponse) return tokenResponse;
       return app.fetch(request, env, ctx);
