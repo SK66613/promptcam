@@ -1,6 +1,6 @@
 import app from './token-entry.js';
 import { handleLegalApi, requireMiniAppConsent } from './legal.js';
-import { maybeHandleLegalWebhook } from './bot-legal.js';
+import { maybeHandleLegalWebhook, refreshLaunchPaymentHub } from './bot-legal.js';
 import { handleLaunchBillingInvoice, LAUNCH_PLANS, maybeHandleLaunchBillingWebhook } from './pro-billing-launch.js';
 
 function json(data, status = 200) {
@@ -80,6 +80,18 @@ async function patchBillingMe(request, env, ctx) {
   return json(data, response.status);
 }
 
+function queueLaunchProHubRefresh(update, env, ctx) {
+  const payment = update?.message?.successful_payment;
+  const telegramId = String(update?.message?.from?.id || '');
+  if (!payment || !telegramId || !String(payment.invoice_payload || '').startsWith('pc:')) return;
+  const work = refreshLaunchPaymentHub(env, telegramId, {
+    view: 'pro',
+    notice: '✅ Оплата PromptCam Pro прошла. Тариф и доступ обновлены.',
+    chatId: telegramId
+  }).catch(() => false);
+  if (ctx && typeof ctx.waitUntil === 'function') ctx.waitUntil(work);
+}
+
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
@@ -89,6 +101,8 @@ export default {
     }
 
     if (url.pathname === '/api/telegram/webhook' && request.method === 'POST') {
+      const paymentProbe = request.clone();
+
       const legalResponse = await maybeHandleLegalWebhook(request, env);
       if (legalResponse) return legalResponse;
 
@@ -96,7 +110,11 @@ export default {
       if (testBlock) return testBlock;
 
       const billingResponse = await maybeHandleLaunchBillingWebhook(request, env);
-      if (billingResponse) return billingResponse;
+      if (billingResponse) {
+        const update = await paymentProbe.json().catch(() => null);
+        queueLaunchProHubRefresh(update, env, ctx);
+        return billingResponse;
+      }
 
       return app.fetch(request, env, ctx);
     }
