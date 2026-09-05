@@ -1,6 +1,64 @@
 (() => {
   'use strict';
 
+  window.__PromptCamEarlyErrors = window.__PromptCamEarlyErrors || [];
+  if (!window.__PromptCamEarlyErrorHook) {
+    window.__PromptCamEarlyErrorHook = true;
+    window.addEventListener('error', (event) => {
+      if (window.__PromptCamDebugActive) return;
+      window.__PromptCamEarlyErrors.push({
+        kind: 'early-error',
+        message: String(event.message || 'Script error').slice(0, 260),
+        file: String(event.filename || '').split('?')[0].split('#')[0],
+        line: Number(event.lineno || 0),
+        column: Number(event.colno || 0)
+      });
+    }, true);
+    window.addEventListener('unhandledrejection', (event) => {
+      if (window.__PromptCamDebugActive) return;
+      const reason = event.reason?.message || event.reason || 'Unhandled promise rejection';
+      window.__PromptCamEarlyErrors.push({ kind: 'early-promise', message: String(reason).slice(0, 260), file: '', line: 0, column: 0 });
+    });
+  }
+
+  function ensureEmergencyDebugButton() {
+    if (document.getElementById('pcdbgBtn') || document.getElementById('promptcamDebugEmergency')) return;
+    if (!window.PromptCamDebug?.open || !document.body) return;
+    const button = document.createElement('button');
+    button.id = 'promptcamDebugEmergency';
+    button.type = 'button';
+    button.textContent = 'DBG';
+    button.setAttribute('aria-label', 'Открыть диагностику PromptCam');
+    button.style.cssText = 'position:fixed;z-index:2147483645;left:10px;bottom:76px;height:28px;padding:0 9px;border:1px solid rgba(255,190,80,.5);border-radius:9px;background:rgba(6,7,12,.92);color:#ffd189;font:800 10px -apple-system,sans-serif;';
+    button.addEventListener('click', () => {
+      button.remove();
+      window.PromptCamDebug?.open?.();
+    }, { once: true });
+    document.body.append(button);
+  }
+
+  function loadDebugPanel() {
+    if (window.PromptCamDebug || document.querySelector('script[data-promptcam-debug]')) return;
+    const script = document.createElement('script');
+    script.src = '/debug-panel.js';
+    script.dataset.promptcamDebug = 'true';
+    script.addEventListener('load', () => {
+      window.__PromptCamDebugActive = true;
+      const early = Array.isArray(window.__PromptCamEarlyErrors) ? window.__PromptCamEarlyErrors : [];
+      early.slice(-10).forEach((item, index) => {
+        window.PromptCamDebug?.mark?.(`Early error ${index + 1}`, 'error', `${item.message}${item.file ? ` · ${item.file}:${item.line || 0}` : ''}`);
+      });
+      window.PromptCamDebug?.mark?.('Debug loader', 'ok', 'debug-panel.js loaded from telegram bridge');
+      if (document.readyState !== 'loading') ensureEmergencyDebugButton();
+    }, { once: true });
+    script.addEventListener('error', () => {
+      window.__PromptCamEarlyErrors.push({ kind: 'debug-loader', message: 'debug-panel.js failed to load', file: '/debug-panel.js', line: 0, column: 0 });
+    }, { once: true });
+    document.head.append(script);
+  }
+
+  loadDebugPanel();
+
   const tg = window.Telegram?.WebApp;
   const isTelegram = Boolean(tg?.initData);
   const root = document.documentElement;
