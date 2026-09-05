@@ -21,17 +21,6 @@ function changes(result) {
   return Number(result?.meta?.changes ?? result?.changes ?? 0);
 }
 
-async function telegramApi(env, method, payload) {
-  if (!env.TELEGRAM_BOT_TOKEN) return null;
-  const response = await fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/${method}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload)
-  });
-  const data = await response.json().catch(() => null);
-  return response.ok && data?.ok ? data.result : null;
-}
-
 export async function maybeHandleSafeTokenPayment(request, env) {
   if (request.method !== 'POST' || !env.DB || !env.TELEGRAM_WEBHOOK_SECRET) return null;
   const provided = request.headers.get('X-Telegram-Bot-Api-Secret-Token') || '';
@@ -74,8 +63,6 @@ export async function maybeHandleSafeTokenPayment(request, env) {
     const paidAt = Number(message.date || Math.floor(Date.now() / 1000));
     const claim = `crediting:${crypto.randomUUID()}`;
 
-    // D1 batch is one transaction. The unique claim string makes the credit SELECTs
-    // visible only to the webhook invocation that changed the order into its claim.
     const results = await env.DB.batch([
       env.DB.prepare(`
         UPDATE ai_token_orders
@@ -117,18 +104,7 @@ export async function maybeHandleSafeTokenPayment(request, env) {
     ]);
 
     const claimed = changes(results?.[0]) > 0;
-    if (!claimed) return json({ ok: true, duplicate: true });
-
-    const wallet = await env.DB.prepare(`
-      SELECT balance FROM ai_token_wallets WHERE telegram_id = ? LIMIT 1
-    `).bind(telegramId).first();
-
-    await telegramApi(env, 'sendMessage', {
-      chat_id: telegramId,
-      text: `✅ +${pack.tokens} AI-токенов начислено.\n\nБаланс: ${Number(wallet?.balance || 0)} токенов.`
-    });
-
-    return json({ ok: true, credited: true });
+    return json({ ok: true, credited: claimed, duplicate: !claimed });
   } catch (_) {
     return json({ ok: false, error: 'token_payment_credit_failed' }, 500);
   }
