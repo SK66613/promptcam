@@ -1,6 +1,7 @@
 import app from './token-entry.js';
 import { handleLegalApi, hasCurrentConsent, requireMiniAppConsent } from './legal.js';
-import { maybeHandleLegalWebhook, refreshLaunchPaymentHub } from './bot-legal.js';
+import { maybeHandleLegalWebhook } from './bot-legal.js';
+import { maybeHandleSubscriptionWebhook, refreshSubscriptionHub } from './bot-subscription.js';
 import { handleLaunchBillingInvoice, LAUNCH_PLANS, maybeHandleLaunchBillingWebhook } from './pro-billing-launch.js';
 import { maybeEnsureWalletForWebhook } from './launch-wallet.js';
 import { consumePurchaseRate, maybeRateLimitPurchaseWebhook, purchaseRateResponse } from './purchase-rate.js';
@@ -65,7 +66,6 @@ async function maybeBlockTestWebhook(request, env) {
     });
     return json({ ok: true });
   }
-
   return null;
 }
 
@@ -113,8 +113,7 @@ function queueLaunchProPostPayment(update, env, ctx) {
         Boolean(payment.is_first_recurring)
       );
     }
-    await refreshLaunchPaymentHub(env, telegramId, {
-      view: 'pro',
+    await refreshSubscriptionHub(env, telegramId, {
       notice: '✅ Оплата PromptCam Pro прошла. Тариф и доступ обновлены.',
       chatId: telegramId
     });
@@ -148,6 +147,9 @@ export default {
 
       const purchaseRate = await maybeRateLimitPurchaseWebhook(request, env);
       if (purchaseRate) return purchaseRate;
+
+      const subscriptionResponse = await maybeHandleSubscriptionWebhook(request, env);
+      if (subscriptionResponse) return subscriptionResponse;
 
       const legalResponse = await maybeHandleLegalWebhook(request, env);
       if (legalResponse) return legalResponse;
