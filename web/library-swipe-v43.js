@@ -14,11 +14,11 @@
     const style = document.createElement('style');
     style.id = STYLE_ID;
     style.textContent = `
-      .promptcam-swipe-shell{position:relative;overflow:hidden;border-radius:14px;background:linear-gradient(90deg,rgba(255,54,83,.04),rgba(255,68,96,.12));touch-action:pan-y}
-      .promptcam-swipe-shell>.creator-template-row-personal,.promptcam-swipe-shell>.creator-favorite-row-personal{position:relative;z-index:2;margin:0!important;transform:translate3d(0,0,0);transition:transform .2s cubic-bezier(.2,.75,.25,1),opacity .18s ease;background:linear-gradient(145deg,rgba(22,21,35,.99),rgba(13,14,25,.99));will-change:transform}
+      .promptcam-swipe-shell{position:relative;overflow:hidden;border-radius:14px;background:linear-gradient(90deg,rgba(255,54,83,.04),rgba(255,68,96,.12));touch-action:pan-y;overscroll-behavior-x:none}
+      .promptcam-swipe-shell>.creator-template-row-personal,.promptcam-swipe-shell>.creator-favorite-row-personal{position:relative;z-index:2;margin:0!important;transform:translate3d(0,0,0);transition:transform .2s cubic-bezier(.2,.75,.25,1),opacity .18s ease;background:linear-gradient(145deg,rgba(22,21,35,.99),rgba(13,14,25,.99));will-change:transform;touch-action:pan-y}
       .promptcam-swipe-shell.is-dragging>.creator-template-row-personal,.promptcam-swipe-shell.is-dragging>.creator-favorite-row-personal{transition:none}
       .promptcam-swipe-delete{position:absolute;z-index:1;top:0;right:0;bottom:0;width:30%;min-width:72px;max-width:112px;display:grid;place-items:center;border:0;background:linear-gradient(145deg,rgba(161,37,61,.9),rgba(111,26,48,.94));color:#ffdbe2;font-size:22px}
-      .promptcam-swipe-delete svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.8}
+      .promptcam-swipe-delete svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
       .promptcam-swipe-delete:disabled{opacity:.55}
       .promptcam-swipe-shell .creator-row-actions{grid-template-columns:1fr!important}
       .promptcam-swipe-shell .creator-row-actions:empty{display:none!important}
@@ -49,9 +49,17 @@
     return svg;
   }
 
+  function rowOf(shell) {
+    return shell?.querySelector('.creator-template-row-personal,.creator-favorite-row-personal') || null;
+  }
+
+  function revealDistance(row) {
+    return Math.min(112, Math.max(72, row.getBoundingClientRect().width * .3));
+  }
+
   function close(shell = openShell, animate = true) {
     if (!shell) return;
-    const row = shell.querySelector('.creator-template-row-personal,.creator-favorite-row-personal');
+    const row = rowOf(shell);
     if (row) {
       if (!animate) row.style.transition = 'none';
       row.style.transform = 'translate3d(0,0,0)';
@@ -63,9 +71,9 @@
 
   function reveal(shell) {
     if (openShell && openShell !== shell) close(openShell);
-    const row = shell.querySelector('.creator-template-row-personal,.creator-favorite-row-personal');
+    const row = rowOf(shell);
     if (!row) return;
-    const target = Math.min(112, Math.max(72, row.getBoundingClientRect().width * .3));
+    const target = revealDistance(row);
     shell.dataset.revealPx = String(Math.round(target));
     row.style.transform = `translate3d(${-target}px,0,0)`;
     shell.classList.add('is-open');
@@ -78,7 +86,7 @@
     const kind = shell.dataset.itemKind || '';
     if (!id || !kind) return;
     const button = shell.querySelector('.promptcam-swipe-delete');
-    const row = shell.querySelector('.creator-template-row-personal,.creator-favorite-row-personal');
+    const row = rowOf(shell);
     if (button) button.disabled = true;
     try {
       await api(kind === 'template' ? 'delete_template' : 'delete_favorite', id);
@@ -110,11 +118,21 @@
   function bindGesture(shell, row) {
     if (shell.dataset.gestureBound === 'true') return;
     shell.dataset.gestureBound = 'true';
+
     let pointerId = null;
     let startX = 0;
     let startY = 0;
     let dragging = false;
-    let horizontal = false;
+    let direction = '';
+    let startedOpen = false;
+    let captured = false;
+
+    function resetCapture() {
+      if (captured && pointerId !== null) {
+        try { row.releasePointerCapture(pointerId); } catch (_) { /* optional */ }
+      }
+      captured = false;
+    }
 
     row.addEventListener('pointerdown', (event) => {
       if (event.pointerType === 'mouse' && event.button !== 0) return;
@@ -123,50 +141,78 @@
       startX = event.clientX;
       startY = event.clientY;
       dragging = false;
-      horizontal = false;
-      try { row.setPointerCapture(pointerId); } catch (_) { /* optional */ }
+      direction = '';
+      startedOpen = shell.classList.contains('is-open');
+      captured = false;
     });
 
     row.addEventListener('pointermove', (event) => {
       if (pointerId !== event.pointerId) return;
       const dx = event.clientX - startX;
       const dy = event.clientY - startY;
-      if (!horizontal) {
-        if (Math.abs(dx) < 7 && Math.abs(dy) < 7) return;
-        if (Math.abs(dy) >= Math.abs(dx)) {
+
+      if (!direction) {
+        if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
+        if (Math.abs(dy) >= Math.abs(dx) * 1.05) {
+          // This is a normal vertical list scroll. Never capture it.
           pointerId = null;
           return;
         }
-        horizontal = true;
+        direction = 'horizontal';
         dragging = true;
+        try {
+          row.setPointerCapture(event.pointerId);
+          captured = true;
+        } catch (_) { /* Pointer capture is optional. */ }
         if (openShell && openShell !== shell) close(openShell);
         shell.classList.add('is-dragging');
       }
-      if (!dragging) return;
+
+      if (direction !== 'horizontal' || !dragging) return;
       event.preventDefault();
-      const target = Math.min(112, Math.max(72, row.getBoundingClientRect().width * .3));
-      const base = shell.classList.contains('is-open') ? -target : 0;
+      const target = revealDistance(row);
+      const base = startedOpen ? -target : 0;
       const offset = Math.max(-target, Math.min(0, base + dx));
       row.style.transform = `translate3d(${offset}px,0,0)`;
     }, { passive: false });
 
-    const finish = (event) => {
+    function finish(event) {
       if (pointerId !== event.pointerId) return;
       const dx = event.clientX - startX;
-      const target = Math.min(112, Math.max(72, row.getBoundingClientRect().width * .3));
-      const wasOpen = shell.classList.contains('is-open');
+      const target = revealDistance(row);
+      const hadDrag = dragging && direction === 'horizontal';
+      resetCapture();
       pointerId = null;
+      dragging = false;
+      direction = '';
       shell.classList.remove('is-dragging');
-      if (!dragging) {
-        if (wasOpen) close(shell);
+
+      if (!hadDrag) {
+        if (startedOpen) close(shell);
         return;
       }
-      dragging = false;
-      if ((!wasOpen && dx < -target * .35) || (wasOpen && dx < target * .55)) reveal(shell);
-      else close(shell);
-    };
+
+      if (startedOpen) {
+        if (dx > target * .35) close(shell);
+        else reveal(shell);
+      } else if (dx < -target * .32) {
+        reveal(shell);
+      } else {
+        close(shell);
+      }
+    }
+
     row.addEventListener('pointerup', finish);
-    row.addEventListener('pointercancel', () => { pointerId = null; dragging = false; close(shell); });
+    row.addEventListener('pointercancel', (event) => {
+      if (pointerId !== event.pointerId) return;
+      resetCapture();
+      pointerId = null;
+      dragging = false;
+      direction = '';
+      shell.classList.remove('is-dragging');
+      if (startedOpen) reveal(shell);
+      else close(shell);
+    });
   }
 
   function wrapRow(row, item, kind) {
@@ -192,12 +238,14 @@
 
   function decorate() {
     decorateTimer = 0;
-    const api = window.PromptCamCreatorLibrary;
-    if (!api) return;
-    const templates = api.getTemplates?.() || [];
-    const favorites = api.getFavorites?.() || [];
-    [...document.querySelectorAll('.creator-template-row-personal')].forEach((row, index) => wrapRow(row, templates[index], 'template'));
-    [...document.querySelectorAll('.creator-favorite-row-personal')].forEach((row, index) => wrapRow(row, favorites[index], 'favorite'));
+    const library = window.PromptCamCreatorLibrary;
+    if (!library) return;
+    const templates = library.getTemplates?.() || [];
+    const favorites = library.getFavorites?.() || [];
+    [...document.querySelectorAll('.creator-template-row-personal')]
+      .forEach((row, index) => wrapRow(row, templates[index], 'template'));
+    [...document.querySelectorAll('.creator-favorite-row-personal')]
+      .forEach((row, index) => wrapRow(row, favorites[index], 'favorite'));
   }
 
   function schedule() {
