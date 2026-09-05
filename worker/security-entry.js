@@ -1,4 +1,5 @@
 import app from './launch-entry.js';
+import { ensureWalletWebhook } from './ai-wallet-launch.js';
 import { syncSubscriptionUpdate } from './subscription-control.js';
 import { refreshSubscriptionHub } from './bot-subscription.js';
 
@@ -22,15 +23,9 @@ function secureResponse(response) {
   headers.set('Permissions-Policy', 'camera=(self), microphone=(self), geolocation=()');
   headers.set('X-Permitted-Cross-Domain-Policies', 'none');
   headers.set('Content-Security-Policy-Report-Only', REPORT_ONLY_CSP);
-
   const contentType = String(headers.get('Content-Type') || '').toLowerCase();
   if (contentType.includes('text/html')) headers.set('Cache-Control', 'no-store, max-age=0');
-
-  return new Response(response.body, {
-    status: response.status,
-    statusText: response.statusText,
-    headers
-  });
+  return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
 }
 
 function json(data, status = 200) {
@@ -66,6 +61,9 @@ async function maybeHandleSubscriptionUpdate(request, env, ctx) {
 export default {
   async fetch(request, env, ctx) {
     try {
+      const url = new URL(request.url);
+      if (url.pathname.startsWith('/api/')) ensureWalletWebhook(request, env, ctx).catch(() => {});
+
       const subscriptionResponse = await maybeHandleSubscriptionUpdate(request, env, ctx);
       if (subscriptionResponse) return secureResponse(subscriptionResponse);
       const response = await app.fetch(request, env, ctx);
