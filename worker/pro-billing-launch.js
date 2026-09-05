@@ -36,14 +36,27 @@ async function ensureUser(env, user) {
       language_code = excluded.language_code,
       updated_at = excluded.updated_at
   `).bind(
-    String(user.id),
-    String(user.username || ''),
-    String(user.first_name || ''),
-    String(user.last_name || ''),
-    String(user.language_code || ''),
-    now,
-    now
+    String(user.id), String(user.username || ''), String(user.first_name || ''), String(user.last_name || ''),
+    String(user.language_code || ''), now, now
   ).run();
+}
+
+async function activeAccess(env, telegramId) {
+  try {
+    const row = await env.DB.prepare(`
+      SELECT plan, access_until, recurring
+      FROM entitlements WHERE telegram_id = ? LIMIT 1
+    `).bind(String(telegramId)).first();
+    const expiresAt = Number(row?.access_until || 0);
+    return {
+      active: expiresAt > Math.floor(Date.now() / 1000),
+      plan: String(row?.plan || ''),
+      expiresAt,
+      recurring: Boolean(Number(row?.recurring || 0))
+    };
+  } catch (_) {
+    return { active: false, plan: '', expiresAt: 0, recurring: false };
+  }
 }
 
 function invoiceBody(order, plan) {
@@ -75,6 +88,10 @@ export async function handleLaunchBillingInvoice(request, env, user, body) {
   if (!plan) return json({ ok: false, error: 'unknown_plan' }, 400);
   try {
     await ensureUser(env, user);
+    const access = await activeAccess(env, user.id);
+    if (access.active) {
+      return json({ ok: false, error: 'pro_already_active', accessUntil: access.expiresAt, recurring: access.recurring }, 409);
+    }
     const order = await createOrder(env, user.id, plan);
     const invoiceUrl = await telegramApi(env, 'createInvoiceLink', invoiceBody(order, plan));
     await env.DB.prepare(`UPDATE billing_orders SET invoice_url = ? WHERE id = ?`).bind(invoiceUrl, order.id).run();
@@ -89,6 +106,8 @@ export async function sendLaunchProInvoice(env, telegramId, planId) {
   if (!plan || !env.DB) throw new Error('unknown_plan');
   const user = await env.DB.prepare(`SELECT telegram_id FROM users WHERE telegram_id = ? LIMIT 1`).bind(String(telegramId)).first();
   if (!user) throw new Error('billing_user_missing');
+  const access = await activeAccess(env, telegramId);
+  if (access.active) throw new Error('pro_already_active');
   const order = await createOrder(env, telegramId, plan);
   await telegramApi(env, 'sendInvoice', { chat_id: String(telegramId), ...invoiceBody(order, plan) });
   await env.DB.prepare(`UPDATE billing_orders SET status = 'invoice_sent' WHERE id = ?`).bind(order.id).run();
@@ -111,14 +130,20 @@ async function handlePreCheckout(env, query) {
       SELECT id, telegram_id, plan, stars, currency, status
       FROM billing_orders WHERE invoice_payload = ? LIMIT 1
     `).bind(String(query.invoice_payload || '')).first();
+    const access = order ? await activeAccess(env, order.telegram_id) : { active: false };
+    const overlappingNewPurchase = Boolean(access.active && String(order?.status || '') !== 'paid');
     const valid = Boolean(
       order && LAUNCH_PLANS[order.plan] &&
       String(order.telegram_id) === String(query.from?.id || '') &&
       query.currency === 'XTR' &&
       Number(query.total_amount) === Number(order.stars) &&
-      !['invoice_failed', 'refunded'].includes(String(order.status || ''))
+      !['invoice_failed', 'refunded'].includes(String(order.status || '')) &&
+      !overlappingNewPurchase
     );
-    await answerPreCheckout(env, query, valid, valid ? '' : 'Не удалось проверить заказ PromptCam. Создай новый счёт.');
+    const message = overlappingNewPurchase
+      ? 'PromptCam Pro уже активен. Дождись конца периода или управляй автопродлением в разделе Тариф.'
+      : 'Не удалось проверить заказ PromptCam. Создай новый счёт.';
+    await answerPreCheckout(env, query, valid, valid ? '' : message);
   } catch (_) {
     await answerPreCheckout(env, query, false, 'PromptCam billing временно недоступен.');
   }
