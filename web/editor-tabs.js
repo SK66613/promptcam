@@ -105,15 +105,15 @@
     }
 
     const aiSetup = document.querySelector('.promptcam-ai-setup-card');
-    if (aiSetup && aiSetup.parentElement !== panels.get('ai')) {
+    if (aiSetup) {
       aiPlaceholder.remove();
-      panels.get('ai').append(aiSetup);
+      if (aiSetup.parentElement !== panels.get('ai')) panels.get('ai').append(aiSetup);
     }
 
     const libraryCard = document.querySelector('.creator-library-card');
-    if (libraryCard && libraryCard.parentElement !== panels.get('library')) {
+    if (libraryCard) {
       libraryPlaceholder.remove();
-      panels.get('library').append(libraryCard);
+      if (libraryCard.parentElement !== panels.get('library')) panels.get('library').append(libraryCard);
     }
   }
 
@@ -177,6 +177,8 @@
       await loadScriptOnce('/ai-setup-v42.js?v=42', 'data-promptcam-ai-setup-v42');
       await loadScriptOnce('/ai-wallet-ui.js?v=42', 'data-promptcam-ai-wallet-ui');
       await loadScriptOnce('/library-swipe-v43.js?v=43', 'data-promptcam-library-swipe-v43');
+      loadStyleOnce('/ui-v45.css?v=45', 'data-promptcam-ui-v45');
+      await loadScriptOnce('/ui-v45.js?v=45', 'data-promptcam-ui-v45');
       mountDynamicCards();
       window.dispatchEvent(new CustomEvent('promptcam:editor-hub-ready'));
     } catch (_) {
