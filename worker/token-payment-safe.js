@@ -68,7 +68,7 @@ export async function maybeHandleSafeTokenPayment(request, env) {
         UPDATE ai_token_orders
         SET status = ?, telegram_payment_charge_id = ?, paid_at = ?
         WHERE id = ?
-          AND status IN ('pending', 'invoice_sent', 'paid_uncredited')
+          AND status IN ('pending', 'invoice_sent', 'checkout_approved', 'paid_uncredited')
           AND (telegram_payment_charge_id IS NULL OR telegram_payment_charge_id = ?)
       `).bind(claim, chargeId, paidAt, order.id, chargeId),
       env.DB.prepare(`
