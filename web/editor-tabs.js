@@ -135,7 +135,6 @@
     return true;
   }
 
-  // The expandable PromptCam dock replaces Telegram MainButton on the editor.
   try { tg?.MainButton?.hide?.(); } catch (_) { /* optional */ }
   document.documentElement.dataset.promptcamNativeMainButton = 'false';
 
@@ -177,6 +176,7 @@
       await loadScriptOnce('/editor-hub-v42.js?v=42', 'data-promptcam-editor-hub-v42');
       await loadScriptOnce('/ai-setup-v42.js?v=42', 'data-promptcam-ai-setup-v42');
       await loadScriptOnce('/ai-wallet-ui.js?v=42', 'data-promptcam-ai-wallet-ui');
+      await loadScriptOnce('/library-swipe-v43.js?v=43', 'data-promptcam-library-swipe-v43');
       mountDynamicCards();
       window.dispatchEvent(new CustomEvent('promptcam:editor-hub-ready'));
     } catch (_) {
