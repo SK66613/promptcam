@@ -1,4 +1,5 @@
 import app from './token-entry.js';
+import { ensureWalletWebhook } from './ai-wallet-launch.js';
 import { handleLegalApi, hasCurrentConsent, requireMiniAppConsent } from './legal.js';
 import { maybeHandleLegalWebhook } from './bot-legal.js';
 import { maybeHandleSubscriptionWebhook, refreshSubscriptionHub } from './bot-subscription.js';
@@ -46,7 +47,6 @@ async function maybeBlockTestWebhook(request, env) {
   let update;
   try { update = await request.clone().json(); }
   catch (_) { return null; }
-
   const query = update?.callback_query;
   const callbackData = String(query?.data || '');
   if (query && (callbackData === 'ait:buy:test60' || callbackData === 'pch:token:test60')) {
@@ -56,7 +56,6 @@ async function maybeBlockTestWebhook(request, env) {
     });
     return json({ ok: true });
   }
-
   const checkout = update?.pre_checkout_query;
   if (checkout && String(checkout.invoice_payload || '').startsWith('pcttest:')) {
     await telegramApi(env, 'answerPreCheckoutQuery', {
@@ -103,7 +102,6 @@ function queueLaunchProPostPayment(update, env, ctx) {
   const payment = update?.message?.successful_payment;
   const telegramId = String(update?.message?.from?.id || '');
   if (!payment || !telegramId || !String(payment.invoice_payload || '').startsWith('pc:')) return;
-
   const work = (async () => {
     if (payment.is_first_recurring || payment.is_recurring) {
       await recordRecurringPayment(
@@ -123,20 +121,20 @@ function queueLaunchProPostPayment(update, env, ctx) {
 
 async function purchaseRateOrResponse(env, telegramId) {
   const rate = await consumePurchaseRate(env, telegramId);
-  return rate.ok ? null : purchaseRateResponse(rate.retryAfter);
+  if (rate.ok) return null;
+  if (!rate.configured) return json({ ok: false, error: 'purchase_rate_database_unavailable' }, 503);
+  return purchaseRateResponse(rate.retryAfter);
 }
 
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
-
-    if (url.pathname === '/api/legal') {
-      return handleLegalApi(request, env, ctx, app);
+    if (url.pathname.startsWith('/api/') && url.pathname !== '/api/telegram/webhook') {
+      ensureWalletWebhook(request, env, ctx).catch(() => {});
     }
 
-    if (url.pathname === '/api/billing/subscription') {
-      return handleSubscriptionApi(request, env, ctx, app);
-    }
+    if (url.pathname === '/api/legal') return handleLegalApi(request, env, ctx, app);
+    if (url.pathname === '/api/billing/subscription') return handleSubscriptionApi(request, env, ctx, app);
 
     if (url.pathname === '/api/telegram/webhook' && request.method === 'POST') {
       const paymentProbe = request.clone();
@@ -163,7 +161,6 @@ export default {
         queueLaunchProPostPayment(update, env, ctx);
         return billingResponse;
       }
-
       return app.fetch(request, env, ctx);
     }
 
@@ -171,9 +168,7 @@ export default {
       return json({ ok: false, error: 'test_payments_disabled' }, 404);
     }
 
-    if (url.pathname === '/api/me' && request.method === 'POST') {
-      return patchBillingMe(request, env, ctx);
-    }
+    if (url.pathname === '/api/me' && request.method === 'POST') return patchBillingMe(request, env, ctx);
 
     if (url.pathname === '/api/billing/invoice' && request.method === 'POST') {
       const body = await readJsonClone(request);
