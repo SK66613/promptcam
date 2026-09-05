@@ -9,51 +9,31 @@
   if (!scriptInput || !editorCard) return;
 
   const BUILT_INS = [
-    {
-      id: 'expert-60',
-      title: '🎓 Экспертный ролик 60 сек',
-      hint: 'Хук → проблема → 3 пункта → CTA',
-      content: '[Хук: неожиданный факт или обещание результата]\n\nЕсли ты [аудитория], скорее всего сталкивался с [проблема].\n\nВот три вещи, которые помогут.\n\nПервое — [совет 1 + короткое объяснение].\n\nВторое — [совет 2 + пример].\n\nТретье — [совет 3 + результат].\n\n[CTA: что сделать зрителю после ролика].'
-    },
-    {
-      id: 'three-tips',
-      title: '⚡ 3 быстрых совета',
-      hint: 'Короткий формат Reels / Shorts',
-      content: 'Три быстрых совета про [тема], которые можно применить сегодня.\n\nПервый: [совет].\n\nВторой: [совет].\n\nТретий: [совет].\n\nСохрани, чтобы не потерять, и попробуй [следующий шаг].'
-    },
-    {
-      id: 'product-demo',
-      title: '📦 Демо продукта',
-      hint: 'Проблема → показ → результат',
-      content: 'Если тебе надоело [проблема], покажу, как я решаю это с помощью [продукт].\n\nВот как это выглядит: [действие / демонстрация].\n\nСамое полезное здесь — [ключевая функция].\n\nВ итоге получаем [конкретный результат].\n\n[CTA: попробовать / узнать подробнее / написать].'
-    },
-    {
-      id: 'story',
-      title: '🎭 История',
-      hint: 'Ситуация → поворот → вывод',
-      content: 'Недавно со мной произошло [ситуация].\n\nСначала я думал, что [ожидание].\n\nНо потом случилось [поворот].\n\nИ именно тогда я понял [главный вывод].\n\nЕсли ты сейчас в похожей ситуации, попробуй [совет / действие].'
-    },
-    {
-      id: 'sales',
-      title: '🔥 Продающий ролик',
-      hint: 'Боль → решение → доказательство → CTA',
-      content: 'Если у тебя [боль аудитории], не обязательно мириться с [последствие].\n\n[Продукт / услуга] помогает [основной результат] за счёт [как это работает].\n\nНапример: [короткое доказательство / кейс / демонстрация].\n\nЕсли хочешь [результат], [CTA: напиши / перейди / попробуй].'
-    },
-    {
-      id: 'update',
-      title: '📰 Апдейт / новость',
-      hint: 'Что произошло → почему важно → что делать',
-      content: 'Короткий апдейт про [тема].\n\nПроизошло вот что: [факт / изменение].\n\nПочему это важно: [значение для аудитории].\n\nЧто я бы сделал сейчас: [практический следующий шаг].\n\n[Финальная мысль / вопрос аудитории].'
-    }
-  ];
+    ['expert-60', '🎓 Экспертный ролик 60 сек', 'Хук → проблема → 3 пункта → CTA', '[Хук: неожиданный факт или обещание результата]\n\nЕсли ты [аудитория], скорее всего сталкивался с [проблема].\n\nВот три вещи, которые помогут.\n\nПервое — [совет 1 + короткое объяснение].\n\nВторое — [совет 2 + пример].\n\nТретье — [совет 3 + результат].\n\n[CTA: что сделать зрителю после ролика].'],
+    ['three-tips', '⚡ 3 быстрых совета', 'Короткий формат Reels / Shorts', 'Три быстрых совета про [тема], которые можно применить сегодня.\n\nПервый: [совет].\n\nВторой: [совет].\n\nТретий: [совет].\n\nСохрани, чтобы не потерять, и попробуй [следующий шаг].'],
+    ['product-demo', '📦 Демо продукта', 'Проблема → показ → результат', 'Если тебе надоело [проблема], покажу, как я решаю это с помощью [продукт].\n\nВот как это выглядит: [действие / демонстрация].\n\nСамое полезное здесь — [ключевая функция].\n\nВ итоге получаем [конкретный результат].\n\n[CTA: попробовать / узнать подробнее / написать].'],
+    ['story', '🎭 История', 'Ситуация → поворот → вывод', 'Недавно со мной произошло [ситуация].\n\nСначала я думал, что [ожидание].\n\nНо потом случилось [поворот].\n\nИ именно тогда я понял [главный вывод].\n\nЕсли ты сейчас в похожей ситуации, попробуй [совет / действие].'],
+    ['sales', '🔥 Продающий ролик', 'Боль → решение → доказательство → CTA', 'Если у тебя [боль аудитории], не обязательно мириться с [последствие].\n\n[Продукт / услуга] помогает [основной результат] за счёт [как это работает].\n\nНапример: [короткое доказательство / кейс / демонстрация].\n\nЕсли хочешь [результат], [CTA: напиши / перейди / попробуй].'],
+    ['update', '📰 Апдейт / новость', 'Что произошло → почему важно → что делать', 'Короткий апдейт про [тема].\n\nПроизошло вот что: [факт / изменение].\n\nПочему это важно: [значение для аудитории].\n\nЧто я бы сделал сейчас: [практический следующий шаг].\n\n[Финальная мысль / вопрос аудитории].']
+  ].map(([id, title, hint, content]) => ({ id, title, hint, content }));
 
-  const state = {
-    tab: 'templates',
-    templates: [],
-    favorites: [],
-    loading: false
-  };
+  const state = { tab: 'templates', templates: [], favorites: [], loading: false };
   const favoriteButtons = new Set();
+
+  function button(text, className = '') {
+    const node = document.createElement('button');
+    node.type = 'button';
+    node.textContent = text;
+    if (className) node.className = className;
+    return node;
+  }
+
+  function sectionLabel(text) {
+    const node = document.createElement('small');
+    node.className = 'creator-library-section-label';
+    node.textContent = text;
+    return node;
+  }
 
   const card = document.createElement('section');
   card.className = 'creator-library-card';
@@ -79,14 +59,8 @@
 
   const tabs = document.createElement('div');
   tabs.className = 'creator-library-tabs';
-  const templatesTab = document.createElement('button');
-  templatesTab.type = 'button';
-  templatesTab.className = 'creator-library-tab';
-  templatesTab.textContent = 'Шаблоны';
-  const favoritesTab = document.createElement('button');
-  favoritesTab.type = 'button';
-  favoritesTab.className = 'creator-library-tab';
-  favoritesTab.textContent = '♥ Избранное';
+  const templatesTab = button('Шаблоны', 'creator-library-tab');
+  const favoritesTab = button('♥ Избранное', 'creator-library-tab');
   tabs.append(templatesTab, favoritesTab);
 
   const templatesPane = document.createElement('section');
@@ -95,10 +69,7 @@
   toolbar.className = 'creator-library-toolbar';
   const toolbarHint = document.createElement('small');
   toolbarHint.textContent = 'Готовый шаблон можно вставить и сразу дописать под себя.';
-  const saveCurrent = document.createElement('button');
-  saveCurrent.type = 'button';
-  saveCurrent.className = 'creator-library-save';
-  saveCurrent.textContent = '💾 Сохранить текущий';
+  const saveCurrent = button('💾 Сохранить текущий', 'creator-library-save');
   toolbar.append(toolbarHint, saveCurrent);
 
   const saveForm = document.createElement('div');
@@ -108,26 +79,15 @@
   saveName.type = 'text';
   saveName.maxLength = 80;
   saveName.placeholder = 'Название шаблона';
-  const saveConfirm = document.createElement('button');
-  saveConfirm.type = 'button';
-  saveConfirm.className = 'primary';
-  saveConfirm.textContent = 'Сохранить';
-  const saveCancel = document.createElement('button');
-  saveCancel.type = 'button';
-  saveCancel.textContent = 'Отмена';
+  const saveConfirm = button('Сохранить', 'primary');
+  const saveCancel = button('Отмена');
   saveForm.append(saveName, saveConfirm, saveCancel);
 
-  const builtLabel = document.createElement('small');
-  builtLabel.className = 'creator-library-section-label';
-  builtLabel.textContent = 'ГОТОВЫЕ ШАБЛОНЫ';
   const builtGrid = document.createElement('div');
   builtGrid.className = 'creator-template-grid';
-  const customLabel = document.createElement('small');
-  customLabel.className = 'creator-library-section-label';
-  customLabel.textContent = 'МОИ ШАБЛОНЫ';
   const customList = document.createElement('div');
   customList.className = 'creator-template-list';
-  templatesPane.append(toolbar, saveForm, builtLabel, builtGrid, customLabel, customList);
+  templatesPane.append(toolbar, saveForm, sectionLabel('ГОТОВЫЕ ШАБЛОНЫ'), builtGrid, sectionLabel('МОИ ШАБЛОНЫ'), customList);
 
   const favoritesPane = document.createElement('section');
   favoritesPane.className = 'creator-library-pane';
@@ -156,24 +116,22 @@
     else delete status.dataset.tone;
   }
 
-  function api(action, payload = {}) {
-    if (!initData) return Promise.reject(new Error('telegram_only'));
-    return fetch('/api/library', {
+  async function api(action, payload = {}) {
+    if (!initData) throw new Error('telegram_only');
+    const response = await fetch('/api/library', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ initData, action, ...payload }),
       cache: 'no-store',
       credentials: 'same-origin'
-    }).then(async (response) => {
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok || !data?.ok) {
-        const error = new Error(data?.error || 'library_request_failed');
-        error.status = response.status;
-        error.payload = data;
-        throw error;
-      }
-      return data;
     });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || !data?.ok) {
+      const error = new Error(data?.error || 'library_request_failed');
+      error.status = response.status;
+      throw error;
+    }
+    return data;
   }
 
   function friendlyError(error) {
@@ -184,9 +142,9 @@
     return 'Не удалось синхронизировать библиотеку. Попробуй ещё раз.';
   }
 
-  function compactPreview(text, maxLength = 130) {
+  function compact(text, max = 130) {
     const value = String(text || '').replace(/\s+/g, ' ').trim();
-    return value.length > maxLength ? `${value.slice(0, maxLength - 1)}…` : value;
+    return value.length > max ? `${value.slice(0, max - 1)}…` : value;
   }
 
   function setTab(value) {
@@ -195,15 +153,11 @@
     favoritesPane.hidden = state.tab !== 'favorites';
     templatesTab.classList.toggle('is-selected', state.tab === 'templates');
     favoritesTab.classList.toggle('is-selected', state.tab === 'favorites');
-    templatesTab.setAttribute('aria-pressed', String(state.tab === 'templates'));
-    favoritesTab.setAttribute('aria-pressed', String(state.tab === 'favorites'));
     renderCount();
   }
 
   function renderCount() {
-    count.textContent = state.tab === 'favorites'
-      ? `${state.favorites.length} ♥`
-      : `${BUILT_INS.length + state.templates.length} шт.`;
+    count.textContent = state.tab === 'favorites' ? `${state.favorites.length} ♥` : `${BUILT_INS.length + state.templates.length} шт.`;
     favoritesTab.textContent = state.favorites.length ? `♥ Избранное · ${state.favorites.length}` : '♥ Избранное';
   }
 
@@ -211,16 +165,13 @@
     const next = String(content || '').trim();
     if (!next) return;
     const current = scriptInput.value.trim();
-    if (current && current !== next) {
-      const confirmed = window.confirm(`Заменить текущий сценарий шаблоном «${titleText}»?`);
-      if (!confirmed) return;
-    }
+    if (current && current !== next && !window.confirm(`Заменить текущий сценарий шаблоном «${titleText}»?`)) return;
     scriptInput.value = next;
     scriptInput.dispatchEvent(new Event('input', { bubbles: true }));
     scriptInput.focus();
     scriptInput.setSelectionRange(0, 0);
     setStatus(`Шаблон «${titleText}» вставлен.`, 'success');
-    tg?.HapticFeedback?.impactOccurred?.('light');
+    try { tg?.HapticFeedback?.impactOccurred?.('light'); } catch (_) { /* optional */ }
   }
 
   function insertIntoScript(text) {
@@ -230,8 +181,8 @@
     const end = Number.isFinite(scriptInput.selectionEnd) ? scriptInput.selectionEnd : start;
     const before = scriptInput.value.slice(0, start);
     const after = scriptInput.value.slice(end);
-    const prefix = before && !/\n\s*$/.test(before) ? '\n\n' : '';
-    const suffix = after && !/^\s*\n/.test(after) ? '\n\n' : '';
+    const prefix = before && !before.endsWith('\n') ? '\n\n' : '';
+    const suffix = after && !after.startsWith('\n') ? '\n\n' : '';
     scriptInput.value = `${before}${prefix}${value}${suffix}${after}`;
     const cursor = before.length + prefix.length + value.length;
     scriptInput.dispatchEvent(new Event('input', { bubbles: true }));
@@ -245,19 +196,13 @@
     for (const item of BUILT_INS) {
       const row = document.createElement('article');
       row.className = 'creator-template-card';
-      const rowHead = document.createElement('div');
-      rowHead.className = 'creator-template-card-head';
-      const rowTitle = document.createElement('strong');
-      rowTitle.textContent = item.title;
-      rowHead.append(rowTitle);
-      const rowHint = document.createElement('p');
-      rowHint.textContent = item.hint;
-      const use = document.createElement('button');
-      use.type = 'button';
-      use.className = 'creator-template-use';
-      use.textContent = 'Вставить шаблон';
+      const strong = document.createElement('strong');
+      strong.textContent = item.title;
+      const hint = document.createElement('p');
+      hint.textContent = item.hint;
+      const use = button('Вставить шаблон', 'creator-template-use');
       use.addEventListener('click', () => replaceScript(item.content, item.title));
-      row.append(rowHead, rowHint, use);
+      row.append(strong, hint, use);
       builtGrid.append(row);
     }
   }
@@ -267,149 +212,35 @@
     if (!state.templates.length) {
       const empty = document.createElement('div');
       empty.className = 'creator-library-empty';
-      empty.textContent = initData
-        ? 'Пока нет своих шаблонов. Сохрани текущий сценарий — он появится здесь на всех твоих устройствах.'
-        : 'Свои шаблоны синхронизируются внутри Telegram Mini App.';
+      empty.textContent = initData ? 'Пока нет своих шаблонов.' : 'Свои шаблоны синхронизируются внутри Telegram Mini App.';
       customList.append(empty);
       return;
     }
-
     for (const item of state.templates) {
       const row = document.createElement('article');
       row.className = 'creator-template-row';
-      const rowHead = document.createElement('div');
-      rowHead.className = 'creator-template-row-head';
-      const rowTitle = document.createElement('strong');
-      rowTitle.textContent = item.title;
-      const date = document.createElement('small');
-      date.textContent = item.updated_at ? new Date(Number(item.updated_at) * 1000).toLocaleDateString('ru-RU') : '';
-      rowHead.append(rowTitle, date);
+      const strong = document.createElement('strong');
+      strong.textContent = item.title;
       const preview = document.createElement('p');
       preview.className = 'creator-template-preview';
-      preview.textContent = compactPreview(item.content);
+      preview.textContent = compact(item.content);
       const actions = document.createElement('div');
       actions.className = 'creator-row-actions';
-      const use = document.createElement('button');
-      use.type = 'button';
-      use.className = 'primary';
-      use.textContent = 'Вставить';
+      const use = button('Вставить', 'primary');
       use.addEventListener('click', () => replaceScript(item.content, item.title));
-      const remove = document.createElement('button');
-      remove.type = 'button';
-      remove.className = 'danger';
-      remove.textContent = 'Удалить';
-      remove.addEventListener('click', () => deleteTemplate(item));
+      const remove = button('Удалить', 'danger');
+      remove.addEventListener('click', async () => {
+        if (!window.confirm(`Удалить шаблон «${item.title}»?`)) return;
+        try {
+          await api('delete_template', { id: item.id });
+          state.templates = state.templates.filter((entry) => Number(entry.id) !== Number(item.id));
+          renderCustomTemplates();
+          renderCount();
+        } catch (error) { setStatus(friendlyError(error), 'error'); }
+      });
       actions.append(use, remove);
-      row.append(rowHead, preview, actions);
+      row.append(strong, preview, actions);
       customList.append(row);
-    }
-  }
-
-  function favoriteLabel(item) {
-    if (item.source === 'take') return item.kind || '🎬 AI Дубль';
-    return item.kind || '✨ AI Live';
-  }
-
-  function renderFavorites() {
-    favoriteList.textContent = '';
-    if (!state.favorites.length) {
-      const empty = document.createElement('div');
-      empty.className = 'creator-library-empty';
-      empty.textContent = 'Пока пусто. Когда AI даст полезный совет, нажми ♡ прямо на карточке.';
-      favoriteList.append(empty);
-      return;
-    }
-
-    for (const item of state.favorites) {
-      const row = document.createElement('article');
-      row.className = 'creator-favorite-row';
-      const rowHead = document.createElement('div');
-      rowHead.className = 'creator-favorite-row-head';
-      const rowTitle = document.createElement('strong');
-      rowTitle.textContent = favoriteLabel(item);
-      const date = document.createElement('small');
-      date.textContent = item.updated_at ? new Date(Number(item.updated_at) * 1000).toLocaleDateString('ru-RU') : '';
-      rowHead.append(rowTitle, date);
-      const text = document.createElement('p');
-      text.className = 'creator-favorite-text';
-      text.textContent = item.text;
-      row.append(rowHead, text);
-      if (item.detail) {
-        const detail = document.createElement('p');
-        detail.className = 'creator-favorite-detail';
-        detail.textContent = item.detail;
-        row.append(detail);
-      }
-      const actions = document.createElement('div');
-      actions.className = 'creator-row-actions';
-      const insert = document.createElement('button');
-      insert.type = 'button';
-      insert.className = 'primary';
-      insert.textContent = 'Вставить в сценарий';
-      insert.addEventListener('click', () => insertIntoScript(item.text));
-      const remove = document.createElement('button');
-      remove.type = 'button';
-      remove.className = 'danger';
-      remove.textContent = 'Убрать ♥';
-      remove.addEventListener('click', () => deleteFavorite(item));
-      actions.append(insert, remove);
-      row.append(actions);
-      favoriteList.append(row);
-    }
-  }
-
-  function renderAll() {
-    renderBuiltIns();
-    renderCustomTemplates();
-    renderFavorites();
-    renderCount();
-    syncHeartButtons();
-  }
-
-  function defaultTemplateName() {
-    const firstLine = scriptInput.value.split(/\n/u).map((line) => line.trim()).find(Boolean) || '';
-    return compactPreview(firstLine, 46) || 'Мой шаблон';
-  }
-
-  async function saveTemplate() {
-    const content = scriptInput.value.trim();
-    const titleText = saveName.value.trim();
-    if (!content) {
-      setStatus('Сначала напиши сценарий, который хочешь сохранить.', 'error');
-      return;
-    }
-    if (!titleText) {
-      setStatus('Дай шаблону короткое название.', 'error');
-      saveName.focus();
-      return;
-    }
-    saveConfirm.disabled = true;
-    try {
-      const data = await api('save_template', { title: titleText, content });
-      const saved = data.template;
-      state.templates = [saved, ...state.templates.filter((item) => Number(item.id) !== Number(saved.id))];
-      saveForm.hidden = true;
-      renderCustomTemplates();
-      renderCount();
-      setStatus(`Шаблон «${saved.title}» сохранён в аккаунт.`, 'success');
-      tg?.HapticFeedback?.notificationOccurred?.('success');
-    } catch (error) {
-      setStatus(friendlyError(error), 'error');
-    } finally {
-      saveConfirm.disabled = false;
-    }
-  }
-
-  async function deleteTemplate(item) {
-    if (!window.confirm(`Удалить шаблон «${item.title}»?`)) return;
-    try {
-      await api('delete_template', { id: item.id });
-      state.templates = state.templates.filter((entry) => Number(entry.id) !== Number(item.id));
-      renderCustomTemplates();
-      renderCount();
-      setStatus('Шаблон удалён.', 'success');
-    } catch (error) {
-      setStatus(friendlyError(error), 'error');
     }
   }
 
@@ -422,123 +253,169 @@
     return state.favorites.find((item) => favoriteKey(item) === key) || null;
   }
 
-  async function saveFavorite(draft) {
-    const data = await api('save_favorite', draft);
-    const saved = data.favorite;
-    state.favorites = [saved, ...state.favorites.filter((item) => Number(item.id) !== Number(saved.id))];
+  function renderFavorites() {
+    favoriteList.textContent = '';
+    if (!state.favorites.length) {
+      const empty = document.createElement('div');
+      empty.className = 'creator-library-empty';
+      empty.textContent = 'Пока пусто. Нажми ♡ на полезной AI-подсказке.';
+      favoriteList.append(empty);
+      return;
+    }
+    for (const item of state.favorites) {
+      const row = document.createElement('article');
+      row.className = 'creator-favorite-row';
+      const strong = document.createElement('strong');
+      strong.textContent = item.kind || (item.source === 'take' ? '🎬 AI Дубль' : '✨ AI Live');
+      const text = document.createElement('p');
+      text.className = 'creator-favorite-text';
+      text.textContent = item.text;
+      row.append(strong, text);
+      if (item.detail) {
+        const detail = document.createElement('p');
+        detail.className = 'creator-favorite-detail';
+        detail.textContent = item.detail;
+        row.append(detail);
+      }
+      const actions = document.createElement('div');
+      actions.className = 'creator-row-actions';
+      const insert = button('Вставить в сценарий', 'primary');
+      insert.addEventListener('click', () => insertIntoScript(item.text));
+      const remove = button('Убрать ♥', 'danger');
+      remove.addEventListener('click', async () => {
+        try {
+          await api('delete_favorite', { id: item.id });
+          state.favorites = state.favorites.filter((entry) => Number(entry.id) !== Number(item.id));
+          renderFavorites();
+          renderCount();
+          syncHearts();
+        } catch (error) { setStatus(friendlyError(error), 'error'); }
+      });
+      actions.append(insert, remove);
+      row.append(actions);
+      favoriteList.append(row);
+    }
+  }
+
+  function renderAll() {
+    renderBuiltIns();
+    renderCustomTemplates();
     renderFavorites();
     renderCount();
-    syncHeartButtons();
-    setStatus('Добавил AI-подсказку в избранное.', 'success');
-    window.dispatchEvent(new CustomEvent('promptcam:library-favorite', { detail: { saved: true, favorite: saved } }));
-    return saved;
+    syncHearts();
   }
 
-  async function deleteFavorite(item) {
+  function defaultTemplateName() {
+    const firstLine = scriptInput.value.split(String.fromCharCode(10)).map((line) => line.trim()).find(Boolean) || '';
+    return compact(firstLine, 46) || 'Мой шаблон';
+  }
+
+  async function saveTemplate() {
+    const content = scriptInput.value.trim();
+    const titleText = saveName.value.trim();
+    if (!content) { setStatus('Сначала напиши сценарий.', 'error'); return; }
+    if (!titleText) { setStatus('Дай шаблону название.', 'error'); return; }
+    saveConfirm.disabled = true;
     try {
-      await api('delete_favorite', { id: item.id });
-      state.favorites = state.favorites.filter((entry) => Number(entry.id) !== Number(item.id));
-      renderFavorites();
+      const data = await api('save_template', { title: titleText, content });
+      state.templates = [data.template, ...state.templates.filter((entry) => Number(entry.id) !== Number(data.template.id))];
+      saveForm.hidden = true;
+      renderCustomTemplates();
       renderCount();
-      syncHeartButtons();
-      setStatus('Убрал подсказку из избранного.', 'success');
-      window.dispatchEvent(new CustomEvent('promptcam:library-favorite', { detail: { saved: false, favorite: item } }));
-    } catch (error) {
-      setStatus(friendlyError(error), 'error');
-      throw error;
-    }
-  }
-
-  async function toggleFavorite(draft, button) {
-    if (!draft?.text) return;
-    button.disabled = true;
-    try {
-      const existing = existingFavorite(draft);
-      if (existing) await deleteFavorite(existing);
-      else await saveFavorite(draft);
-      tg?.HapticFeedback?.impactOccurred?.('light');
-    } catch (error) {
-      setStatus(friendlyError(error), 'error');
-    } finally {
-      button.disabled = false;
-      syncHeartButton(button);
-    }
+      setStatus(`Шаблон «${data.template.title}» сохранён.`, 'success');
+    } catch (error) { setStatus(friendlyError(error), 'error'); }
+    finally { saveConfirm.disabled = false; }
   }
 
   function liveDraft() {
-    const suggestion = document.getElementById('liveAiSuggestion');
-    const text = suggestion?.querySelector('.live-ai-suggestion-text')?.textContent?.trim() || '';
-    const kind = suggestion?.querySelector('.live-ai-suggestion-type')?.textContent?.trim() || '✨ AI Live';
-    const mode = window.PromptCamLiveAI?.getStatus?.().mode || '';
-    return { source: 'live', mode, kind, text, detail: '' };
+    const node = document.getElementById('liveAiSuggestion');
+    return {
+      source: 'live',
+      mode: window.PromptCamLiveAI?.getStatus?.().mode || '',
+      kind: node?.querySelector('.live-ai-suggestion-type')?.textContent?.trim() || '✨ AI Live',
+      text: node?.querySelector('.live-ai-suggestion-text')?.textContent?.trim() || '',
+      detail: ''
+    };
   }
 
   function takeDraft() {
-    const take = document.querySelector('.take-director-card');
-    const text = take?.querySelector('.take-director-card-text')?.textContent?.trim() || '';
-    const kind = take?.querySelector('.take-director-card-title')?.textContent?.trim() || '🎬 AI Дубль';
-    const detail = take?.querySelector('.take-director-card-anchor')?.textContent?.trim() || '';
-    return { source: 'take', mode: 'take', kind, text, detail };
+    const node = document.querySelector('.take-director-card');
+    return {
+      source: 'take',
+      mode: 'take',
+      kind: node?.querySelector('.take-director-card-title')?.textContent?.trim() || '🎬 AI Дубль',
+      text: node?.querySelector('.take-director-card-text')?.textContent?.trim() || '',
+      detail: node?.querySelector('.take-director-card-anchor')?.textContent?.trim() || ''
+    };
   }
 
   function createHeart(factory) {
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.className = 'creator-favorite-heart';
-    button.textContent = '♡';
-    button.setAttribute('aria-label', 'Добавить AI-подсказку в избранное');
-    button._promptcamFavoriteFactory = factory;
-    button.addEventListener('click', (event) => {
+    const node = button('♡', 'creator-favorite-heart');
+    node._promptcamFavoriteFactory = factory;
+    node.setAttribute('aria-label', 'Добавить AI-подсказку в избранное');
+    node.addEventListener('click', async (event) => {
       event.preventDefault();
       event.stopPropagation();
-      toggleFavorite(factory(), button);
+      const draft = factory();
+      if (!draft.text) return;
+      node.disabled = true;
+      try {
+        const existing = existingFavorite(draft);
+        if (existing) {
+          await api('delete_favorite', { id: existing.id });
+          state.favorites = state.favorites.filter((entry) => Number(entry.id) !== Number(existing.id));
+        } else {
+          const data = await api('save_favorite', draft);
+          state.favorites = [data.favorite, ...state.favorites.filter((entry) => Number(entry.id) !== Number(data.favorite.id))];
+        }
+        renderFavorites();
+        renderCount();
+        syncHearts();
+      } catch (error) { setStatus(friendlyError(error), 'error'); }
+      finally {
+        node.disabled = false;
+        syncHeart(node);
+      }
     });
-    favoriteButtons.add(button);
-    return button;
+    favoriteButtons.add(node);
+    return node;
   }
 
-  function syncHeartButton(button) {
-    if (!button?.isConnected) {
-      favoriteButtons.delete(button);
+  function syncHeart(node) {
+    if (!node?.isConnected) {
+      favoriteButtons.delete(node);
       return;
     }
-    const draft = button._promptcamFavoriteFactory?.();
+    const draft = node._promptcamFavoriteFactory?.();
     const saved = Boolean(draft?.text && existingFavorite(draft));
-    button.classList.toggle('is-saved', saved);
-    button.textContent = saved ? '♥' : '♡';
-    button.setAttribute('aria-label', saved ? 'Убрать AI-подсказку из избранного' : 'Добавить AI-подсказку в избранное');
+    node.classList.toggle('is-saved', saved);
+    node.textContent = saved ? '♥' : '♡';
   }
 
-  function syncHeartButtons() {
-    for (const button of [...favoriteButtons]) syncHeartButton(button);
+  function syncHearts() {
+    for (const node of [...favoriteButtons]) syncHeart(node);
   }
 
-  function decorateRecommendationCards() {
-    const live = document.getElementById('liveAiSuggestion');
-    const liveHead = live?.querySelector('.live-ai-suggestion-head');
+  function decorateRecommendations() {
+    const liveHead = document.querySelector('#liveAiSuggestion .live-ai-suggestion-head');
     if (liveHead && !liveHead.querySelector('.creator-favorite-heart')) {
       const close = liveHead.querySelector('.live-ai-suggestion-close');
       const heart = createHeart(liveDraft);
       if (close) liveHead.insertBefore(heart, close);
       else liveHead.append(heart);
     }
-
-    const take = document.querySelector('.take-director-card');
-    const takeHead = take?.querySelector('.take-director-card-head');
+    const takeHead = document.querySelector('.take-director-card .take-director-card-head');
     if (takeHead && !takeHead.querySelector('.creator-favorite-heart')) {
       const close = takeHead.querySelector('.take-director-card-close');
       const heart = createHeart(takeDraft);
       if (close) takeHead.insertBefore(heart, close);
       else takeHead.append(heart);
     }
-    syncHeartButtons();
+    syncHearts();
   }
 
   async function loadRemote() {
-    if (!initData || state.loading) {
-      if (!initData) setStatus('Готовые шаблоны работают здесь. Свои шаблоны и избранное синхронизируются внутри Telegram.');
-      return;
-    }
+    if (!initData || state.loading) return;
     state.loading = true;
     setStatus('Синхронизирую библиотеку…');
     try {
@@ -547,20 +424,14 @@
       state.favorites = Array.isArray(data.favorites) ? data.favorites : [];
       renderAll();
       setStatus('Библиотека синхронизирована.', 'success');
-    } catch (error) {
-      setStatus(friendlyError(error), 'error');
-    } finally {
-      state.loading = false;
-    }
+    } catch (error) { setStatus(friendlyError(error), 'error'); }
+    finally { state.loading = false; }
   }
 
   templatesTab.addEventListener('click', () => setTab('templates'));
   favoritesTab.addEventListener('click', () => setTab('favorites'));
   saveCurrent.addEventListener('click', () => {
-    if (!initData) {
-      setStatus('Сохранение своих шаблонов доступно внутри Telegram Mini App.', 'error');
-      return;
-    }
+    if (!initData) { setStatus('Сохранение доступно внутри Telegram Mini App.', 'error'); return; }
     saveName.value = defaultTemplateName();
     saveForm.hidden = false;
     saveName.focus();
@@ -573,19 +444,19 @@
     if (event.key === 'Escape') saveForm.hidden = true;
   });
 
+  let recommendationObserver = null;
   if (cameraView) {
-    const observer = new MutationObserver(decorateRecommendationCards);
-    observer.observe(cameraView, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ['class'] });
-    window.addEventListener('pagehide', () => observer.disconnect(), { once: true });
+    recommendationObserver = new MutationObserver(decorateRecommendations);
+    recommendationObserver.observe(cameraView, { childList: true, subtree: true });
   }
-  window.addEventListener('promptcam:creator-modules-ready', decorateRecommendationCards);
-  window.addEventListener('promptcam:live-ai-state', decorateRecommendationCards);
 
   renderAll();
   setTab('templates');
-  decorateRecommendationCards();
+  decorateRecommendations();
   loadRemote();
+  window.dispatchEvent(new CustomEvent('promptcam:creator-library-ready'));
 
+  window.addEventListener('pagehide', () => recommendationObserver?.disconnect(), { once: true });
   window.PromptCamCreatorLibrary = Object.freeze({
     getTemplates: () => state.templates.map((item) => ({ ...item })),
     getFavorites: () => state.favorites.map((item) => ({ ...item })),
