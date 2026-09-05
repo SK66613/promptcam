@@ -1,6 +1,7 @@
 import app from './token-entry.js';
 import { handleLegalApi, requireMiniAppConsent } from './legal.js';
 import { maybeHandleLegalWebhook } from './bot-legal.js';
+import { handleLaunchBillingInvoice, LAUNCH_PLANS, maybeHandleLaunchBillingWebhook } from './pro-billing-launch.js';
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -62,26 +63,21 @@ async function maybeBlockTestWebhook(request, env) {
     return json({ ok: true });
   }
 
-  // Never discard successful_payment: if Telegram already charged a user before
-  // the deploy, the existing idempotent handler must still deliver the tokens.
+  // If Telegram already charged an old test invoice, let the existing idempotent
+  // successful_payment handler deliver the purchased tokens.
   return null;
 }
 
-async function enforcePurchaseConsent(request, env, ctx, url) {
-  if (request.method !== 'POST') return null;
-  let body = null;
-  if (url.pathname === '/api/billing/invoice') {
-    body = await readJsonClone(request);
-  } else if (url.pathname === '/api/ai/wallet') {
-    body = await readJsonClone(request);
-    if (body?.action !== 'buy_pack') return null;
-  } else {
-    return null;
-  }
-
-  if (!body) return null;
-  const check = await requireMiniAppConsent(request, env, ctx, app, body);
-  return check.ok ? null : check.response;
+async function patchBillingMe(request, env, ctx) {
+  const response = await app.fetch(request, env, ctx);
+  if (!response.ok) return response;
+  const data = await response.json().catch(() => null);
+  if (!data || !Array.isArray(data.plans)) return response;
+  data.plans = data.plans.map((plan) => {
+    const launch = LAUNCH_PLANS[plan?.id];
+    return launch ? { ...plan, stars: launch.stars, recurring: launch.recurring } : plan;
+  });
+  return json(data, response.status);
 }
 
 export default {
@@ -95,8 +91,13 @@ export default {
     if (url.pathname === '/api/telegram/webhook' && request.method === 'POST') {
       const legalResponse = await maybeHandleLegalWebhook(request, env);
       if (legalResponse) return legalResponse;
+
       const testBlock = await maybeBlockTestWebhook(request, env);
       if (testBlock) return testBlock;
+
+      const billingResponse = await maybeHandleLaunchBillingWebhook(request, env);
+      if (billingResponse) return billingResponse;
+
       return app.fetch(request, env, ctx);
     }
 
@@ -104,8 +105,25 @@ export default {
       return json({ ok: false, error: 'test_payments_disabled' }, 404);
     }
 
-    const consentResponse = await enforcePurchaseConsent(request, env, ctx, url);
-    if (consentResponse) return consentResponse;
+    if (url.pathname === '/api/me' && request.method === 'POST') {
+      return patchBillingMe(request, env, ctx);
+    }
+
+    if (url.pathname === '/api/billing/invoice' && request.method === 'POST') {
+      const body = await readJsonClone(request);
+      if (!body) return json({ ok: false, error: 'invalid_json' }, 400);
+      const consent = await requireMiniAppConsent(request, env, ctx, app, body);
+      if (!consent.ok) return consent.response;
+      return handleLaunchBillingInvoice(request, env, consent.user, body);
+    }
+
+    if (url.pathname === '/api/ai/wallet' && request.method === 'POST') {
+      const body = await readJsonClone(request);
+      if (body?.action === 'buy_pack') {
+        const consent = await requireMiniAppConsent(request, env, ctx, app, body);
+        if (!consent.ok) return consent.response;
+      }
+    }
 
     return app.fetch(request, env, ctx);
   }
