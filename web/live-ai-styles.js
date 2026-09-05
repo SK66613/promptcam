@@ -138,35 +138,55 @@
     render();
   });
 
-  function loadTakeDirector() {
-    if (document.querySelector('script[data-promptcam-take-director]')) return;
-    const script = document.createElement('script');
-    script.src = '/take-director.js';
-    script.dataset.promptcamTakeDirector = 'true';
-    document.head.append(script);
+  function ensureScriptAiStyles() {
+    if (document.querySelector('link[data-promptcam-script-ai]')) return;
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = '/script-ai.css';
+    link.dataset.promptcamScriptAi = 'true';
+    document.head.append(link);
   }
 
-  function loadScriptAi() {
-    if (!document.querySelector('link[data-promptcam-script-ai]')) {
-      const link = document.createElement('link');
-      link.rel = 'stylesheet';
-      link.href = '/script-ai.css';
-      link.dataset.promptcamScriptAi = 'true';
-      document.head.append(link);
+  function loadScriptOnce(src, attribute) {
+    return new Promise((resolve, reject) => {
+      const existing = document.querySelector(`script[${attribute}]`);
+      if (existing) {
+        if (existing.dataset.promptcamReady === 'true') resolve(existing);
+        else {
+          existing.addEventListener('load', () => resolve(existing), { once: true });
+          existing.addEventListener('error', reject, { once: true });
+        }
+        return;
+      }
+      const script = document.createElement('script');
+      script.src = src;
+      script.setAttribute(attribute, 'true');
+      script.addEventListener('load', () => {
+        script.dataset.promptcamReady = 'true';
+        resolve(script);
+      }, { once: true });
+      script.addEventListener('error', reject, { once: true });
+      document.head.append(script);
+    });
+  }
+
+  async function loadCreatorModules() {
+    ensureScriptAiStyles();
+    try {
+      await loadScriptOnce('/script-ai.js', 'data-promptcam-script-ai');
+      await loadScriptOnce('/take-director-beats.js', 'data-promptcam-take-beats');
+      await loadScriptOnce('/take-director.js', 'data-promptcam-take-director');
+      window.dispatchEvent(new CustomEvent('promptcam:creator-modules-ready'));
+    } catch (_) {
+      // AI Live remains usable even if an optional creator module fails to load.
     }
-    if (document.querySelector('script[data-promptcam-script-ai]')) return;
-    const script = document.createElement('script');
-    script.src = '/script-ai.js';
-    script.dataset.promptcamScriptAi = 'true';
-    document.head.append(script);
   }
 
   ensureControls();
-  loadTakeDirector();
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', loadScriptAi, { once: true });
+    document.addEventListener('DOMContentLoaded', loadCreatorModules, { once: true });
   } else {
-    loadScriptAi();
+    loadCreatorModules();
   }
 
   window.PromptCamLiveAIStyles = Object.freeze({
