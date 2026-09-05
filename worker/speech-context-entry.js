@@ -1,5 +1,6 @@
 import app from './speech-entry.js';
 import { maybeHandleTakeDirector } from './take-director.js';
+import { handleScriptAi } from './script-ai.js';
 
 const SPEECH_CONTEXT_MODES = new Set(['crew', 'acting']);
 const SPEECH_CONTEXT_MAX_CHARS = 520;
@@ -80,9 +81,26 @@ function withSpeechDebugHeader(response, speech) {
   });
 }
 
+function methodNotAllowed() {
+  return new Response(JSON.stringify({ ok: false, error: 'method_not_allowed' }), {
+    status: 405,
+    headers: {
+      'Content-Type': 'application/json; charset=utf-8',
+      'Cache-Control': 'no-store',
+      'X-Content-Type-Options': 'nosniff'
+    }
+  });
+}
+
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
+
+    if (url.pathname === '/api/ai/script') {
+      if (request.method !== 'POST') return methodNotAllowed();
+      return handleScriptAi(request, env, ctx);
+    }
+
     if (url.pathname === '/api/ai/live' && request.method === 'POST') {
       const takeResponse = await maybeHandleTakeDirector(request, env, ctx);
       if (takeResponse) return takeResponse;
