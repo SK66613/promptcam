@@ -2,6 +2,7 @@ import app from './token-entry.js';
 import { handleLegalApi, requireMiniAppConsent } from './legal.js';
 import { maybeHandleLegalWebhook, refreshLaunchPaymentHub } from './bot-legal.js';
 import { handleLaunchBillingInvoice, LAUNCH_PLANS, maybeHandleLaunchBillingWebhook } from './pro-billing-launch.js';
+import { maybeEnsureWalletForWebhook } from './launch-wallet.js';
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -102,6 +103,7 @@ export default {
 
     if (url.pathname === '/api/telegram/webhook' && request.method === 'POST') {
       const paymentProbe = request.clone();
+      await maybeEnsureWalletForWebhook(request, env);
 
       const legalResponse = await maybeHandleLegalWebhook(request, env);
       if (legalResponse) return legalResponse;
