@@ -184,7 +184,7 @@
     ensureCreatorLibraryStyles();
     try {
       await loadScriptOnce('/script-ai.js', 'data-promptcam-script-ai');
-      await loadScriptOnce('/creator-library.js', 'data-promptcam-creator-library');
+      await loadScriptOnce('/creator-library-safe.js?v=36', 'data-promptcam-creator-library');
       await loadScriptOnce('/take-director-beats.js', 'data-promptcam-take-beats');
       await loadScriptOnce('/take-director.js', 'data-promptcam-take-director');
       window.dispatchEvent(new CustomEvent('promptcam:creator-modules-ready'));
