@@ -1,7 +1,7 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "promptcam",
-  "main": "./worker/speech-context-entry.js",
+  "main": "./worker/token-entry.js",
   "compatibility_date": "2026-09-03",
   "keep_vars": true,
   "assets": {
