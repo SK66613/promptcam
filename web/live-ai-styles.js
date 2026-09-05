@@ -184,6 +184,7 @@
       await loadScriptOnce('/favorite-script-visibility.js?v=39', 'data-promptcam-favorite-visibility');
       await loadScriptOnce('/take-director-beats.js', 'data-promptcam-take-beats');
       await loadScriptOnce('/take-director.js', 'data-promptcam-take-director');
+      await loadScriptOnce('/favorites-ui-v41.js?v=41', 'data-promptcam-favorites-ui-v41');
       window.dispatchEvent(new CustomEvent('promptcam:creator-modules-ready'));
     } catch (_) {
       // AI Live remains usable even if an optional creator module fails to load.

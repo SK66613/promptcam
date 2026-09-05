@@ -1,0 +1,120 @@
+/* PromptCam UI polish v41: readable creator tools + clear AI active state. */
+
+/* #40 used ::after for the token badge while Live AI also used ::after for the active dot.
+   Keep the token balance inside the AI panel / wallet card and reserve the rail control for one clear state dot. */
+.camera-tool-button.live-ai-tool.is-active::after,
+.live-ai-tool[data-ai-tokens]::after {
+  content: none !important;
+  display: none !important;
+}
+
+.live-ai-active-dot {
+  position: absolute;
+  z-index: 3;
+  top: 7px;
+  right: 7px;
+  width: 10px;
+  height: 10px;
+  border: 2px solid rgba(14, 15, 25, .9);
+  border-radius: 50%;
+  background: #59e996;
+  box-shadow: 0 0 0 2px rgba(89, 233, 150, .14), 0 0 13px rgba(89, 233, 150, .8);
+  opacity: 0;
+  transform: scale(.72);
+  transition: opacity .15s ease, transform .15s ease;
+  pointer-events: none;
+}
+
+.live-ai-tool.is-active .live-ai-active-dot {
+  opacity: 1;
+  transform: scale(1);
+}
+
+/* Favorite actions: spoken ideas keep the script action, production notes keep only a compact heart. */
+.creator-favorite-row-personal .creator-row-actions {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.creator-favorite-row-personal .creator-row-actions.is-production-only {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.creator-favorite-row-personal .creator-unlike-button {
+  display: grid;
+  width: 34px !important;
+  min-width: 34px;
+  height: 34px;
+  min-height: 34px !important;
+  padding: 0 !important;
+  place-items: center;
+  border-color: rgba(255, 88, 132, .34) !important;
+  background: rgba(255, 70, 118, .1) !important;
+  color: #ff739c !important;
+  font-size: 18px !important;
+  line-height: 1;
+}
+
+/* AI Script Studio — closer to the readability of Settings instead of tiny utility copy. */
+.script-ai-title strong { font-size: 15px !important; }
+.script-ai-title small { font-size: 10.5px !important; line-height: 1.4 !important; }
+.script-ai-action strong { font-size: 12px !important; }
+.script-ai-action small { font-size: 10px !important; line-height: 1.35 !important; }
+.script-ai-status { font-size: 10.5px !important; line-height: 1.45 !important; }
+.script-ai-preview-head strong { font-size: 12px !important; }
+.script-ai-preview-head small { font-size: 10px !important; }
+.script-ai-preview-text { font-size: 13.5px !important; line-height: 1.55 !important; }
+.script-ai-summary { font-size: 10.5px !important; line-height: 1.45 !important; }
+.script-ai-beat b { font-size: 10.5px !important; }
+.script-ai-beat span { font-size: 9.5px !important; }
+.script-ai-apply,
+.script-ai-cancel,
+.script-ai-undo { font-size: 11px !important; }
+.script-ai-saved-beats > small { font-size: 9.5px !important; }
+
+/* Creator Library. */
+.creator-library-title strong { font-size: 15px !important; }
+.creator-library-title small { font-size: 10.5px !important; line-height: 1.4 !important; }
+.creator-library-count { font-size: 9.5px !important; }
+.creator-library-tab { font-size: 11.5px !important; }
+.creator-library-toolbar small { font-size: 10.5px !important; line-height: 1.45 !important; }
+.creator-library-save { font-size: 11px !important; }
+.creator-library-save-form input { font-size: 12px !important; }
+.creator-library-save-form button { font-size: 11px !important; }
+.creator-library-section-label { font-size: 9.5px !important; }
+.creator-template-row strong,
+.creator-favorite-row strong { font-size: 12.5px !important; line-height: 1.35 !important; }
+.creator-template-row small,
+.creator-favorite-row small { font-size: 9.5px !important; }
+.creator-template-row-personal .creator-template-preview,
+.creator-favorite-row-personal .creator-favorite-text { font-size: 12px !important; line-height: 1.5 !important; }
+.creator-favorite-detail { font-size: 10.5px !important; line-height: 1.45 !important; }
+.creator-row-actions button { font-size: 11px !important; min-height: 35px !important; }
+.creator-library-empty { font-size: 10.5px !important; }
+.creator-library-status { font-size: 10.5px !important; line-height: 1.45 !important; }
+.creator-smart-preview-head strong { font-size: 12px !important; }
+.creator-smart-preview-head small { font-size: 10px !important; }
+.creator-smart-summary { font-size: 10.5px !important; }
+.creator-smart-text { font-size: 13.5px !important; line-height: 1.55 !important; }
+.creator-smart-actions button { font-size: 11px !important; }
+
+/* AI wallet was intentionally compact in #40; make it match the rest of the AI tab. */
+.ai-wallet-copy strong { font-size: 14px !important; }
+.ai-wallet-copy small { font-size: 10px !important; line-height: 1.4 !important; }
+.ai-wallet-balance small { font-size: 9px !important; }
+.ai-wallet-costs { font-size: 10px !important; line-height: 1.45 !important; }
+.ai-wallet-actions button { font-size: 11px !important; min-height: 38px !important; }
+.ai-wallet-pack strong { font-size: 12px !important; }
+.ai-wallet-pack small { font-size: 10px !important; line-height: 1.35 !important; }
+.ai-wallet-note { font-size: 9.5px !important; line-height: 1.45 !important; }
+.ai-wallet-status { font-size: 10px !important; line-height: 1.4 !important; }
+.ai-wallet-history-row b { font-size: 10.5px !important; }
+.ai-wallet-history-row small { font-size: 9px !important; }
+.ai-wallet-history-row em { font-size: 11px !important; }
+
+@media (max-width: 390px) {
+  .script-ai-action { min-height: 48px; }
+  .creator-favorite-row-personal .creator-unlike-button { width: 36px !important; min-width: 36px; height: 36px; }
+}
